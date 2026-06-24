@@ -4,6 +4,7 @@ from .EvidenciasOperativasController import (
     EvidenciasOperativasListCreateController,
     EvidenciasOperativasDetailController,
     EvidenciasOperativasSoportesController,
+    EvidenciasOperativasUploadParamsController,
     EvidenciasOperativasEnviarController,
     EvidenciasOperativasRevisarController,
     EvidenciasOperativasReabrirController,
@@ -18,6 +19,7 @@ urlpatterns = [
     # Evidencias operativas (modelo con estados y soportes múltiples)
     path('<str:accion_id>/evidencias-operativas/', EvidenciasOperativasListCreateController.as_view(), name='evidencias-operativas-list'),
     path('<str:accion_id>/evidencias-operativas/<str:ev_id>/', EvidenciasOperativasDetailController.as_view(), name='evidencias-operativas-detail'),
+    path('<str:accion_id>/evidencias-operativas/<str:ev_id>/upload-params/', EvidenciasOperativasUploadParamsController.as_view(), name='evidencias-operativas-upload-params'),
     path('<str:accion_id>/evidencias-operativas/<str:ev_id>/soportes/', EvidenciasOperativasSoportesController.as_view(), name='evidencias-operativas-soportes'),
     path('<str:accion_id>/evidencias-operativas/<str:ev_id>/soportes/<str:soporte_id>/', EvidenciasOperativasSoportesController.as_view(), name='evidencias-operativas-soporte-delete'),
     path('<str:accion_id>/evidencias-operativas/<str:ev_id>/enviar/', EvidenciasOperativasEnviarController.as_view(), name='evidencias-operativas-enviar'),

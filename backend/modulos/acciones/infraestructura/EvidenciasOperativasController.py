@@ -172,6 +172,48 @@ class EvidenciasOperativasDetailController(APIView):
         return Response({'ok': True, 'datos': _s_evidencia(ev)}, status=200)
 
 
+class EvidenciasOperativasUploadParamsController(APIView):
+    """Genera parámetros firmados para upload directo al frontend → Cloudinary."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, accion_id, ev_id):
+        try:
+            accion, _, es_gestor = _verificar_acceso_actividad(request.user, accion_id)
+        except ValueError as e:
+            return Response({'ok': False, 'error': str(e)}, status=404)
+        except PermissionError as e:
+            return Response({'ok': False, 'error': str(e)}, status=403)
+        try:
+            ev = _get_ev(ev_id, accion_id, request.user, es_gestor)
+        except ValueError as e:
+            return Response({'ok': False, 'error': str(e)}, status=404)
+        except PermissionError as e:
+            return Response({'ok': False, 'error': str(e)}, status=403)
+
+        if ev.estado not in ('borrador', 'reabierta'):
+            return Response({'ok': False, 'error': 'Solo se pueden agregar soportes en borrador o reabierta.'}, status=400)
+
+        try:
+            import cloudinary as _cld
+            import time as _time, hashlib as _hs
+            cfg = _cld.config()
+            if not cfg.api_secret:
+                return Response({'ok': False, 'error': 'Cloudinary no configurado en este entorno.'}, status=503)
+            ts = int(_time.time())
+            folder = f'evidencias/{accion_id}/{ev_id}'
+            to_sign = f'folder={folder}&timestamp={ts}'
+            sig = _hs.sha1(f'{to_sign}{cfg.api_secret}'.encode()).hexdigest()
+            return Response({'ok': True, 'datos': {
+                'timestamp': ts,
+                'signature': sig,
+                'api_key': cfg.api_key,
+                'cloud_name': cfg.cloud_name,
+                'folder': folder,
+            }})
+        except Exception:
+            return Response({'ok': False, 'error': 'Error generando parámetros de upload.'}, status=500)
+
+
 class EvidenciasOperativasSoportesController(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -195,8 +237,56 @@ class EvidenciasOperativasSoportesController(APIView):
             return Response({'ok': False, 'error': 'Solo se pueden agregar soportes en borrador o reabierta.'}, status=400)
 
         archivo = request.FILES.get('archivo')
+        file_url_directo = request.data.get('file_url') if not archivo else None
+
+        # ── Rama: upload directo (frontend → Cloudinary → backend registra URL) ──
+        if file_url_directo:
+            file_url_directo = str(file_url_directo).strip()
+            # Solo aceptar URLs de Cloudinary
+            if 'res.cloudinary.com' not in file_url_directo and 'cloudinary.com' not in file_url_directo:
+                return Response({'ok': False, 'error': 'URL de archivo no válida.'}, status=400)
+
+            nombre = str(request.data.get('file_name', 'archivo')).strip() or 'archivo'
+            mime_real = str(request.data.get('file_type', 'application/octet-stream')).strip()
+            try:
+                tamano = int(request.data.get('file_size', 0))
+            except (ValueError, TypeError):
+                tamano = 0
+
+            if tamano > MAX_SOPORTE_MB * 1024 * 1024:
+                return Response({'ok': False, 'error': f'El archivo supera el límite de {MAX_SOPORTE_MB} MB.'}, status=400)
+
+            requisito_id = request.data.get('requisito_id')
+            requisito_obj = None
+            if requisito_id:
+                try:
+                    requisito_obj = RequisitoVerificacionAccionModel.objects.get(
+                        id=requisito_id, accion_id=accion_id, activo=True
+                    )
+                    if requisito_obj.tipos_archivo_permitidos and mime_real not in requisito_obj.tipos_archivo_permitidos:
+                        return Response({'ok': False, 'error': 'Tipo de archivo no permitido para este requisito.'}, status=400)
+                except RequisitoVerificacionAccionModel.DoesNotExist:
+                    return Response({'ok': False, 'error': 'Requisito no encontrado.'}, status=404)
+
+            upload = UploadModel.objects.create(
+                action=accion,
+                evidencia_actividad=ev,
+                requisito=requisito_obj,
+                uploaded_by=request.user,
+                file_url=file_url_directo,
+                file_name=nombre,
+                file_type=mime_real,
+                file_size=tamano,
+                status='pendiente',
+            )
+            _audit(request, 'AGREGAR_SOPORTE_EVIDENCIA', 'Upload', str(upload.id), {
+                'evidencia_id': str(ev_id), 'file_name': nombre, 'file_type': mime_real, 'modo': 'directo',
+            })
+            return Response({'ok': True, 'datos': _s_soporte(upload)}, status=201)
+
+        # ── Rama: upload multipart (fallback / mobile) ───────────────────────
         if not archivo:
-            return Response({'ok': False, 'error': 'Se requiere un archivo (campo "archivo").'}, status=400)
+            return Response({'ok': False, 'error': 'Se requiere un archivo o una URL de Cloudinary.'}, status=400)
 
         nombre = archivo.name
         tamano = archivo.size
@@ -217,11 +307,10 @@ class EvidenciasOperativasSoportesController(APIView):
                 requisito_obj = RequisitoVerificacionAccionModel.objects.get(
                     id=requisito_id, accion_id=accion_id, activo=True
                 )
-                # Validar tipos permitidos del requisito
                 if requisito_obj.tipos_archivo_permitidos:
                     if mime_real not in requisito_obj.tipos_archivo_permitidos:
                         transaction.set_rollback(True)
-                        return Response({'ok': False, 'error': f'Tipo de archivo no permitido para este requisito.'}, status=400)
+                        return Response({'ok': False, 'error': 'Tipo de archivo no permitido para este requisito.'}, status=400)
             except RequisitoVerificacionAccionModel.DoesNotExist:
                 return Response({'ok': False, 'error': 'Requisito no encontrado.'}, status=404)
 
@@ -269,7 +358,7 @@ class EvidenciasOperativasSoportesController(APIView):
             return Response({'ok': False, 'error': 'Error al registrar el soporte.'}, status=400)
 
         _audit(request, 'AGREGAR_SOPORTE_EVIDENCIA', 'Upload', str(upload.id), {
-            'evidencia_id': str(ev_id), 'file_name': nombre, 'file_type': mime_real,
+            'evidencia_id': str(ev_id), 'file_name': nombre, 'file_type': mime_real, 'modo': 'multipart',
         })
         return Response({'ok': True, 'datos': _s_soporte(upload)}, status=201)
 

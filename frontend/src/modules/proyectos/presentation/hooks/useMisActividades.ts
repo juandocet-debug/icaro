@@ -194,28 +194,58 @@ export const useMisActividades = (selectedAccionId?: string) => {
     }
   };
 
-  // ── Guardar soporte (Carga derecha) ─────────────────────────────────────
+  // ── Guardar soporte — upload directo a Cloudinary, sin bloquear Gunicorn ─
   const handleGuardarSoporte = async () => {
     if (!selectedAct || !activeEv || !soporteReqId || !soporteFile) return;
     setSoporteSaving(true);
     setSoporteErr(null);
     try {
+      const accionId = selectedAct.accion.id;
+      const evId = activeEv.id;
+
+      // 1. Obtener parámetros firmados del backend (~20ms, libera el slot)
+      const paramsRes = await api.get(
+        `/api/mis-actividades/${accionId}/evidencias-operativas/${evId}/upload-params/`
+      );
+      if (!paramsRes.data.ok) throw new Error(paramsRes.data.error || 'Error obteniendo parámetros.');
+      const { timestamp, signature, api_key, cloud_name, folder } = paramsRes.data.datos;
+
+      // 2. Upload directo al CDN de Cloudinary (no pasa por Railway)
       const fd = new FormData();
-      fd.append('archivo', soporteFile, soporteFileName);
-      fd.append('requisito_id', soporteReqId);
-      await api.post(`/api/mis-actividades/${selectedAct.accion.id}/evidencias-operativas/${activeEv.id}/soportes/`, fd, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-      
+      fd.append('file', soporteFile, soporteFileName);
+      fd.append('api_key', api_key);
+      fd.append('timestamp', String(timestamp));
+      fd.append('signature', signature);
+      fd.append('folder', folder);
+
+      const cloudRes = await fetch(
+        `https://api.cloudinary.com/v1_1/${cloud_name}/auto/upload`,
+        { method: 'POST', body: fd }
+      );
+      const cloudData = await cloudRes.json();
+      if (!cloudRes.ok) throw new Error(cloudData?.error?.message || 'Error subiendo a Cloudinary.');
+
+      // 3. Registrar soporte en backend con la URL resultante (~50ms)
+      await api.post(
+        `/api/mis-actividades/${accionId}/evidencias-operativas/${evId}/soportes/`,
+        {
+          file_url: cloudData.secure_url,
+          file_name: soporteFileName,
+          file_type: soporteFile.type || 'application/octet-stream',
+          file_size: cloudData.bytes ?? soporteFile.size ?? 0,
+          requisito_id: soporteReqId || undefined,
+        }
+      );
+
       setSoporteFile(null);
       setSoporteFileName('');
       setSoporteObs('');
-      
-      const evsRes = await api.get(`/api/mis-actividades/${selectedAct.accion.id}/evidencias-operativas/`);
+
+      const evsRes = await api.get(`/api/mis-actividades/${accionId}/evidencias-operativas/`);
       setEvidencias(evsRes.data.datos || []);
     } catch (e: any) {
       const d = e?.response?.data;
-      setSoporteErr(d?.error || d?.errores?.join(' · ') || 'Error al subir soporte.');
+      setSoporteErr(d?.error || d?.errores?.join(' · ') || e?.message || 'Error al subir soporte.');
     } finally {
       setSoporteSaving(false);
     }
