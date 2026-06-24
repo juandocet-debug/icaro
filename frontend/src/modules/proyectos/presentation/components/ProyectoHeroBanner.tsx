@@ -42,9 +42,13 @@ export const ProyectoHeroBanner: React.FC<ProyectoHeroBannerProps> = ({
     <Card style={{ height: isMobile ? 200 : 260, overflow: 'hidden', borderRadius: 24, backgroundColor: colors.primary, marginBottom: spacing.lg, width: '100%' }} padding="none">
       {proyecto.coverImageUrl && !imageError && (
         <>
-          <Image key={imageTimestamp}
-            source={{ uri: `${proyecto.coverImageUrl}${imageTimestamp ? `?t=${imageTimestamp}` : ''}` }}
-            style={styles.heroBgImg} resizeMode="cover" onError={() => setImageError(true)} />
+          <Image
+            key={`cover-${proyecto.coverImageUrl}`}
+            source={{ uri: proyecto.coverImageUrl }}
+            style={styles.heroBgImg}
+            resizeMode="cover"
+            onError={() => setImageError(true)}
+          />
           <View style={styles.heroBgOverlay} />
         </>
       )}
