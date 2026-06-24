@@ -16,6 +16,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { listarProyectosUseCase } from '../../../shared/dependencies';
 import { AxiosMetaRepository } from '../../proyectos/infrastructure/AxiosMetaRepository';
 import { ProfileEditModal } from './components/ProfileEditModal';
+import { api } from '../../../services/api';
 
 export const HomeScreen: React.FC = () => {
   const { logout, userProfile } = useAuth();
@@ -98,33 +99,14 @@ export const HomeScreen: React.FC = () => {
     const fetchMetrics = async () => {
       setLoadingMetrics(true);
       try {
-        const metas = await metaRepo.listar(selectedProjectId);
-        let compsCount = 0;
-        let accsCount = 0;
-        let accumProgress = 0;
-
-        await Promise.all(
-          metas.map(async (meta) => {
-            const comps = await metaRepo.listarComponentes(selectedProjectId, meta.id);
-            compsCount += comps.length;
-            await Promise.all(
-              comps.map(async (comp) => {
-                const accs = await metaRepo.listarAcciones(comp.id);
-                accsCount += accs.length;
-                accs.forEach(a => {
-                  accumProgress += a.avancePorcentaje || 0;
-                });
-              })
-            );
-          })
+        const res = await api.get<{ ok: boolean; datos: typeof metrics }>(
+          `/api/proyectos/${selectedProjectId}/stats/`
         );
-
-        const averageProgress = accsCount > 0 ? Math.round(accumProgress / accsCount) : 0;
         setMetrics({
-          metasCount: metas.length,
-          compsCount,
-          accsCount,
-          averageProgress,
+          metasCount: res.data.datos.metasCount,
+          compsCount: res.data.datos.compsCount,
+          accsCount: res.data.datos.accsCount,
+          averageProgress: Math.round(res.data.datos.averageProgress),
         });
       } catch (err) {
         console.error('Error calculating metrics:', err);
@@ -133,7 +115,7 @@ export const HomeScreen: React.FC = () => {
       }
     };
     fetchMetrics();
-  }, [selectedProjectId, metaRepo]);
+  }, [selectedProjectId]);
 
   // Chequeos de Rol y Acción Dinámica
   const puedeCrearProyecto = can('proyectos.crear');

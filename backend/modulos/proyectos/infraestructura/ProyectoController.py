@@ -168,3 +168,36 @@ class ProyectoPortadaController(APIView):
         proyecto.cover_image = archivo
         proyecto.save(update_fields=['cover_image'])
         return Response({'ok': True, 'datos': _s(proyecto)}, status=200)
+
+class ProyectoStatsController(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, proyecto_id):
+        from modulos.proyectos.infraestructura.helpers import check_project_access
+        try:
+            check_project_access(proyecto_id, request.user)
+        except ValueError as e:
+            return Response({'ok': False, 'error': str(e)}, status=404)
+        except PermissionError as e:
+            return Response({'ok': False, 'error': str(e)}, status=403)
+
+        from modulos.metas.infraestructura.models import MetaModel
+        from modulos.componentes.infraestructura.models import ComponenteModel
+        from modulos.acciones.infraestructura.models import AccionModel
+        from django.db.models import Avg
+
+        metas_count = MetaModel.objects.filter(proyecto_id=proyecto_id, activo=True).count()
+        componentes_count = ComponenteModel.objects.filter(proyecto_id=proyecto_id).count()
+        acciones_qs = AccionModel.objects.filter(component__proyecto_id=proyecto_id)
+        acciones_count = acciones_qs.count()
+        avg_progress = acciones_qs.aggregate(Avg('avance_porcentaje'))['avance_porcentaje__avg'] or 0
+
+        return Response({
+            'ok': True,
+            'datos': {
+                'metasCount': metas_count,
+                'compsCount': componentes_count,
+                'accsCount': acciones_count,
+                'averageProgress': round(avg_progress, 2)
+            }
+        }, status=200)
