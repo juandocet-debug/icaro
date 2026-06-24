@@ -232,34 +232,40 @@ STORAGES = {
 DATA_UPLOAD_MAX_MEMORY_SIZE = 6 * 1024 * 1024   # 6 MB
 FILE_UPLOAD_MAX_MEMORY_SIZE = 6 * 1024 * 1024   # 6 MB
 
-if ENVIRONMENT == 'production':
-    required_s3_vars = [
-        'AWS_ACCESS_KEY_ID',
-        'AWS_SECRET_ACCESS_KEY',
-        'AWS_STORAGE_BUCKET_NAME',
-        'AWS_S3_ENDPOINT_URL'
-    ]
-    missing_vars = [var for var in required_s3_vars if not os.getenv(var)]
-    if missing_vars:
-        raise ImproperlyConfigured(
-            f"Almacenamiento Cloudflare R2 / AWS S3 es OBLIGATORIO en producción. "
-            f"Faltan credenciales: {', '.join(missing_vars)}"
-        )
+_CLOUDINARY_URL = os.getenv('CLOUDINARY_URL', '')
+_AWS_KEY        = os.getenv('AWS_ACCESS_KEY_ID', '')
 
-    STORAGES["default"]["BACKEND"] = 'storages.backends.s3boto3.S3Boto3Storage'
-
-    # Cloudflare R2 — configuración de rendimiento
-    AWS_ACCESS_KEY_ID         = os.getenv('AWS_ACCESS_KEY_ID')
-    AWS_SECRET_ACCESS_KEY     = os.getenv('AWS_SECRET_ACCESS_KEY')
-    AWS_STORAGE_BUCKET_NAME   = os.getenv('AWS_STORAGE_BUCKET_NAME')
-    AWS_S3_ENDPOINT_URL       = os.getenv('AWS_S3_ENDPOINT_URL')  # URL R2
-    AWS_S3_CUSTOM_DOMAIN      = os.getenv('AWS_S3_CUSTOM_DOMAIN', '')  # CDN opcional
-    AWS_DEFAULT_ACL            = 'public-read'  # imágenes públicas
-    AWS_S3_FILE_OVERWRITE      = True  # sobreescribir archivos con mismo nombre
-    AWS_S3_OBJECT_PARAMETERS   = {
-        'CacheControl': 'max-age=86400, public',  # 1 día de caché en CDN
+if _CLOUDINARY_URL:
+    # ── Cloudinary (CDN + transformaciones + WebP automático) ─────────────────
+    INSTALLED_APPS += ['cloudinary_storage', 'cloudinary']
+    CLOUDINARY_STORAGE = {
+        'CLOUDINARY_URL': _CLOUDINARY_URL,
+        'MAGIC_FILE_PATH': None,
+        'INVALID_VIDEO_ERROR_MESSAGE': 'Por favor sube un archivo de video válido.',
+        'EXCLUDE_DELETE_ORPHANED_MEDIA_UNDER_FOLDER': '',
+        'STATIC_TAG': 'static',
+        'STATICFILES_MANIFEST_ROOT': os.path.join(BASE_DIR, 'manifest'),
     }
-    AWS_QUERYSTRING_AUTH       = False  # URLs sin firma (necesario para imágenes públicas)
+    STORAGES["default"]["BACKEND"] = 'cloudinary_storage.storage.MediaCloudinaryStorage'
+    MEDIA_URL = '/media/'  # Cloudinary ignora este valor pero Django lo requiere
+
+elif _AWS_KEY:
+    # ── Cloudflare R2 / AWS S3 (fallback si no hay Cloudinary) ───────────────
+    STORAGES["default"]["BACKEND"] = 'storages.backends.s3boto3.S3Boto3Storage'
+    AWS_ACCESS_KEY_ID       = _AWS_KEY
+    AWS_SECRET_ACCESS_KEY   = os.getenv('AWS_SECRET_ACCESS_KEY')
+    AWS_STORAGE_BUCKET_NAME = os.getenv('AWS_STORAGE_BUCKET_NAME')
+    AWS_S3_ENDPOINT_URL     = os.getenv('AWS_S3_ENDPOINT_URL')
+    AWS_S3_CUSTOM_DOMAIN    = os.getenv('AWS_S3_CUSTOM_DOMAIN', '')
+    AWS_DEFAULT_ACL         = 'public-read'
+    AWS_S3_FILE_OVERWRITE   = False
+    AWS_S3_OBJECT_PARAMETERS = {'CacheControl': 'max-age=86400, public'}
+    AWS_QUERYSTRING_AUTH    = False
+
+elif ENVIRONMENT == 'production':
+    raise ImproperlyConfigured(
+        "En producción se requiere CLOUDINARY_URL o credenciales AWS (AWS_ACCESS_KEY_ID, etc.)."
+    )
 
 else:
     MEDIA_URL  = '/media/'

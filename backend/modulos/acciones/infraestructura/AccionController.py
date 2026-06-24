@@ -7,8 +7,6 @@ from rest_framework.permissions import IsAuthenticated
 from .DjangoAccionRepository import DjangoAccionRepository
 from .DjangoRequisitoVerificacionRepository import DjangoRequisitoVerificacionRepository
 from modulos.acciones.aplicacion.CrearAccionUseCase import CrearAccionUseCase
-from modulos.acciones.aplicacion.ListarAccionesUseCase import ListarAccionesUseCase
-from modulos.acciones.aplicacion.ObtenerAccionUseCase import ObtenerAccionUseCase
 from modulos.acciones.aplicacion.ActualizarAccionUseCase import ActualizarAccionUseCase
 from modulos.acciones.aplicacion.EliminarAccionUseCase import EliminarAccionUseCase
 from modulos.acciones.aplicacion.ConfigurarRequisitosVerificacionUseCase import ConfigurarRequisitosVerificacionUseCase
@@ -138,7 +136,15 @@ class AccionListCreateController(APIView):
             return Response({'ok': False, 'error': str(e)}, status=403)
 
         from .models import AccionModel
+        from rest_framework.pagination import PageNumberPagination
         acciones = AccionModel.objects.filter(component_id=comp_id).order_by('display_order', 'created_at')
+        paginator = PageNumberPagination()
+        paginator.page_size = 50
+        paginator.page_size_query_param = 'page_size'
+        paginator.max_page_size = 100
+        page = paginator.paginate_queryset(acciones, request, view=self)
+        if page is not None:
+            return paginator.get_paginated_response([_s(a, include_requisitos=True) for a in page])
         datos = [_s(a, include_requisitos=True) for a in acciones]
         return Response({'ok': True, 'datos': datos}, status=200)
 

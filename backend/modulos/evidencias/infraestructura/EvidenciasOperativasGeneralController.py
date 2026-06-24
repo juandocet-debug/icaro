@@ -117,13 +117,19 @@ class EvidenciasOperativasGeneralController(APIView):
         except PermissionError as e:
             return Response({'ok': False, 'error': str(e)}, status=403)
 
+        from django.db.models import Prefetch
+        from modulos.acciones.infraestructura.models import RequisitoVerificacionAccionModel
         qs = EvidenciaActividadModel.objects.filter(
             accion__component__project_id=proyecto_id
         ).select_related(
             'creada_por', 'creada_por__profile',
             'accion', 'accion__component', 'accion__component__meta'
         ).prefetch_related(
-            'soportes', 'soportes__requisito'
+            'soportes', 'soportes__requisito',
+            Prefetch(
+                'accion__requisitos',
+                queryset=RequisitoVerificacionAccionModel.objects.filter(activo=True).order_by('orden'),
+            ),
         )
 
         return Response({'ok': True, 'datos': [_serialize_evidencia_general(ev) for ev in qs]}, status=200)

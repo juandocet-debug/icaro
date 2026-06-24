@@ -94,49 +94,104 @@ def _serialize_upload(u):
         'created_at': u.created_at.strftime('%d %b %Y') if u.created_at else None,
     }
 
-def _serialize_actividad_detallada(accion, usuario, request=None):
-    proyeccion = float(accion.proyeccion_cuantitativa or 0)
-    ejecucion = float(accion.ejecucion_acumulada or 0)
-    pct = round((ejecucion / proyeccion) * 100, 2) if proyeccion > 0 else 0.0
+def _build_user_context(usuario, accion_ids: list, proyecto_ids: list) -> dict:
+    """
+    Pre-calcula en bulk (3 queries) lo que antes era N queries dentro del loop:
+    - asignaciones del usuario por accion_id
+    - roles del usuario por proyecto_id
+    - es_gestor (bool único para el conjunto de proyectos)
+    Retorna un dict que _serialize_actividad_detallada consume sin tocar la BD.
+    """
+    _ROLES_GESTOR = ['superadministrador', 'administrador_proyecto', 'coordinador_proyecto', 'coordinador_general']
 
-    # Obtener mi asignación
-    asignacion = AsignacionResponsableAccionModel.objects.filter(
-        accion=accion,
-        usuario=usuario,
-        activo=True
-    ).first()
+    asignaciones = {
+        str(a.accion_id): a
+        for a in AsignacionResponsableAccionModel.objects.filter(
+            accion_id__in=accion_ids, usuario=usuario, activo=True
+        )
+    }
+
+    roles_por_proyecto = {}
+    for row in UsuarioRolModel.objects.filter(
+        usuario=usuario, proyecto_id__in=proyecto_ids, activo=True
+    ).values('proyecto_id', 'rol__nombre'):
+        pid = str(row['proyecto_id'])
+        roles_por_proyecto.setdefault(pid, []).append(row['rol__nombre'])
+
+    es_gestor = usuario.is_superuser or UsuarioRolModel.objects.filter(
+        usuario=usuario, proyecto_id__in=proyecto_ids,
+        rol__codigo__in=_ROLES_GESTOR, activo=True
+    ).exists()
+
+    return {
+        'asignaciones': asignaciones,
+        'roles_por_proyecto': roles_por_proyecto,
+        'es_gestor': es_gestor,
+    }
+
+
+def _serialize_actividad_detallada(accion, usuario, request=None, _ctx: dict | None = None):
+    """
+    _ctx: resultado de _build_user_context(). Si se pasa, evita queries N+1.
+    Sin _ctx (endpoint de detalle individual) hace las queries normales.
+    """
+    proyeccion = float(accion.proyeccion_cuantitativa or 0)
+    ejecucion  = float(accion.ejecucion_acumulada or 0)
+    pct        = round((ejecucion / proyeccion) * 100, 2) if proyeccion > 0 else 0.0
+    proyecto_id = str(accion.component.project_id)
+
+    _ROLES_GESTOR = ['superadministrador', 'administrador_proyecto', 'coordinador_proyecto', 'coordinador_general']
+
+    if _ctx:
+        asignacion = _ctx['asignaciones'].get(str(accion.id))
+        roles      = _ctx['roles_por_proyecto'].get(proyecto_id, [])
+        es_gestor  = _ctx['es_gestor']
+    else:
+        asignacion = AsignacionResponsableAccionModel.objects.filter(
+            accion=accion, usuario=usuario, activo=True
+        ).first()
+        roles = list(UsuarioRolModel.objects.filter(
+            usuario=usuario, proyecto_id=proyecto_id, activo=True
+        ).values_list('rol__nombre', flat=True))
+        es_gestor = usuario.is_superuser or UsuarioRolModel.objects.filter(
+            usuario=usuario, proyecto_id=proyecto_id,
+            rol__codigo__in=_ROLES_GESTOR, activo=True
+        ).exists()
 
     tipo_asig = asignacion.tipo_asignacion if asignacion else None
 
-    # Obtener roles del usuario en el proyecto
-    proyecto_id = accion.component.project_id
-    roles = list(UsuarioRolModel.objects.filter(
-        usuario=usuario,
-        proyecto_id=proyecto_id,
-        activo=True
-    ).values_list('rol__nombre', flat=True))
+    # Requisitos — usa prefetch si está disponible, query individual si no
+    try:
+        requisitos = list(accion.requisitos.all())
+    except Exception:
+        requisitos = list(RequisitoVerificacionAccionModel.objects.filter(
+            accion=accion, activo=True
+        ).order_by('orden'))
 
-    # Requisitos de verificación
-    requisitos = list(RequisitoVerificacionAccionModel.objects.filter(
-        accion=accion,
-        activo=True
-    ).order_by('orden'))
-
-    total_requisitos = len(requisitos)
+    total_requisitos  = len(requisitos)
     requisitos_cumplidos = 0
+    estado_verif = 'sin_requisitos'
 
     if total_requisitos > 0:
         req_ids = [r.id for r in requisitos]
-        from django.db.models import Count
-        counts = dict(
-            UploadModel.objects.filter(
-                action_id=accion.id,
-                requisito_id__in=req_ids
-            ).values('requisito_id').annotate(total=Count('id')).values_list('requisito_id', 'total')
-        )
+
+        # Uploads: usa prefetch si está disponible
+        try:
+            all_uploads = list(accion.uploads.all())
+            all_uploads = [u for u in all_uploads if u.requisito_id in req_ids]
+        except Exception:
+            all_uploads = list(UploadModel.objects.filter(
+                action_id=accion.id, requisito_id__in=req_ids
+            ).order_by('created_at'))
+
+        counts = {}
+        uploads_por_req: dict = {}
+        for u in all_uploads:
+            counts[u.requisito_id] = counts.get(u.requisito_id, 0) + 1
+            uploads_por_req.setdefault(u.requisito_id, []).append(u)
+
         for r in requisitos:
-            cargados = counts.get(r.id, 0)
-            if cargados >= r.min_archivos:
+            if counts.get(r.id, 0) >= r.min_archivos:
                 requisitos_cumplidos += 1
 
         if requisitos_cumplidos == total_requisitos:
@@ -145,24 +200,10 @@ def _serialize_actividad_detallada(accion, usuario, request=None):
             estado_verif = 'pendiente'
         else:
             estado_verif = 'incompleto'
-    else:
-        estado_verif = 'sin_requisitos'
 
-    # Serializar requisitos con conteo + lista de evidencias cargadas
-    requisitos_data = []
-    if total_requisitos > 0:
-        # Precargar todos los uploads de la acción en una sola query
-        req_ids = [r.id for r in requisitos]
-        all_uploads = list(UploadModel.objects.filter(
-            action_id=accion.id, requisito_id__in=req_ids
-        ).order_by('created_at'))
-        uploads_por_req = {}
-        for u in all_uploads:
-            uploads_por_req.setdefault(u.requisito_id, []).append(u)
-
+        requisitos_data = []
         for r in requisitos:
             cargados = counts.get(r.id, 0)
-            evidencias_req = uploads_por_req.get(r.id, [])
             requisitos_data.append({
                 'id': str(r.id),
                 'nombre': r.nombre,
@@ -184,20 +225,13 @@ def _serialize_actividad_detallada(accion, usuario, request=None):
                         'observaciones': u.observaciones,
                         'created_at': u.created_at.strftime('%d %b %Y') if u.created_at else None,
                     }
-                    for u in evidencias_req
+                    for u in uploads_por_req.get(r.id, [])
                 ],
             })
-
-    # Permisos dinámicos
-    es_gestor = usuario.is_superuser or UsuarioRolModel.objects.filter(
-        usuario=usuario,
-        proyecto_id=proyecto_id,
-        rol__codigo__in=['superadministrador', 'administrador_proyecto', 'coordinador_proyecto', 'coordinador_general'],
-        activo=True
-    ).exists()
+    else:
+        requisitos_data = []
 
     puede_registrar_ejecucion = es_gestor or (tipo_asig == 'responsable')
-    # La asignación activa como responsable o apoyo es autorización suficiente para subir evidencias
     puede_subir_evidencia = es_gestor or tipo_asig in ('responsable', 'apoyo')
 
     return {
@@ -254,14 +288,18 @@ class MisActividadesController(APIView):
             qs = use_case.ejecutar(request.user, q, estado, proyecto_id)
             total = qs.count()
 
-            # Paginación slicing SQL
             offset = (page - 1) * page_size
-            items = qs[offset:offset+page_size]
+            items = list(qs[offset:offset + page_size])  # evaluar una sola vez
+
+            # Pre-calcular en bulk para evitar N+1 dentro del loop de serialización
+            action_ids   = [a.id for a in items]
+            proyecto_ids = list({str(a.component.project_id) for a in items})
+            ctx = _build_user_context(request.user, action_ids, proyecto_ids) if items else {}
 
             return Response({
                 'ok': True,
                 'count': total,
-                'datos': [_serialize_actividad_detallada(a, request.user, request) for a in items]
+                'datos': [_serialize_actividad_detallada(a, request.user, request, _ctx=ctx) for a in items]
             }, status=200)
 
 class MisActividadesEjecucionController(APIView):
