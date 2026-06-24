@@ -187,8 +187,8 @@ class ProyectoStatsController(APIView):
         from django.db.models import Avg
 
         metas_count = MetaModel.objects.filter(proyecto_id=proyecto_id, activo=True).count()
-        componentes_count = ComponenteModel.objects.filter(proyecto_id=proyecto_id).count()
-        acciones_qs = AccionModel.objects.filter(component__proyecto_id=proyecto_id)
+        componentes_count = ComponenteModel.objects.filter(project_id=proyecto_id).count()
+        acciones_qs = AccionModel.objects.filter(component__project_id=proyecto_id)
         acciones_count = acciones_qs.count()
         avg_progress = acciones_qs.aggregate(Avg('avance_porcentaje'))['avance_porcentaje__avg'] or 0
 

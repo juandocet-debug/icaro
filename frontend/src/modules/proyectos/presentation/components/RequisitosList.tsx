@@ -5,8 +5,10 @@ import { colors } from '../../../../shared/constants/colors';
 import { typography } from '../../../../shared/constants/typography';
 import { styles } from './MisActividadesStyles';
 
+import { env } from '../../../../config/env';
+
 const toUrl = (url: string) => {
-  const API_BASE = (process.env as any).EXPO_PUBLIC_API_URL ?? ('http://localhost:' + '8000');
+  const API_BASE = env.apiUrl;
   return url?.startsWith('http') ? url : `${API_BASE}${url}`;
 };
 

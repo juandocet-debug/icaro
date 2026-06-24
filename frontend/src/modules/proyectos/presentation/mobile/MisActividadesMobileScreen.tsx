@@ -19,8 +19,10 @@ const fileIcon = (t: string): any =>
 const fileColor = (t: string) =>
   t?.startsWith('image/') ? '#10b981' : t === 'application/pdf' ? '#ef4444' : colors.primary;
 
+import { env } from '../../../../config/env';
+
 const toUrl = (url: string) => {
-  const API_BASE = (process.env as any).EXPO_PUBLIC_API_URL ?? ('http://localhost:' + '8000');
+  const API_BASE = env.apiUrl;
   return url?.startsWith('http') ? url : `${API_BASE}${url}`;
 };
 

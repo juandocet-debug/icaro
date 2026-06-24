@@ -16,7 +16,9 @@ type ApiProyecto = {
   cover_image_url: string | null;
 };
 
-const API_BASE = (process.env as any).EXPO_PUBLIC_API_URL ?? ('http://localhost:' + '8000');
+import { env } from '../../../config/env';
+
+const API_BASE = env.apiUrl;
 
 const toAbsolute = (url: string | null): string | null => {
   if (!url) return null;
