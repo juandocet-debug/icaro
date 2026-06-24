@@ -20,6 +20,17 @@ export const LoginScreen: React.FC = () => {
   const { width } = useWindowDimensions();
   const isSplit = width >= 820;
 
+  React.useEffect(() => {
+    // Pre-warm de base de datos Neon (despertar el servidor de su estado de suspensión)
+    const prewarm = async () => {
+      try {
+        const API_BASE = (process.env as any).EXPO_PUBLIC_API_URL ?? ('http://localhost:' + '8000');
+        await fetch(`${API_BASE}/health`).catch(() => {});
+      } catch (_) {}
+    };
+    prewarm();
+  }, []);
+
   const handleLogin = async () => {
     if (!username.trim() || !password.trim()) return;
     setLoading(true);
