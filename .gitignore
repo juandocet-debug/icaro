@@ -1,0 +1,36 @@
+# Entorno / Secretos
+.env
+.env.*
+!.env.example
+!.env.development.example
+!.env.production.example
+
+# Python
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Bases locales
+*.sqlite3
+*.db
+backend/*.sqlite3
+backend/*.db
+
+# Frontend / Node
+node_modules/
+.expo/
+dist/
+web-build/
+.next/
+
+# Logs / Temporales
+*.log
+tmp/
+temp/
+
+# Archivos de tickets y logs de soporte
+tiket*.txt

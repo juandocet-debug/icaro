@@ -1,0 +1,19 @@
+# Archivos de entorno — nunca commitear
+.env
+.env.local
+.env.production
+.env.staging
+
+# Dependencias de Node
+node_modules/
+
+# Build output
+dist/
+.expo/
+
+# Caché
+.metro-health-check*
+
+# Sistema operativo
+.DS_Store
+Thumbs.db

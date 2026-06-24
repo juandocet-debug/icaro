@@ -1,0 +1,64 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  backend-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: |
+          cd backend
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install ruff pytest pytest-django coverage
+      - name: Lint with Ruff
+        run: |
+          cd backend
+          ruff check .
+      - name: Check Django Migrations
+        run: |
+          cd backend
+          # Configuramos variables dummy para que settings.py no falle
+          export ENVIRONMENT=development
+          export EXPECTED_DATABASE=icaro_dev
+          export DATABASE_URL=postgres://dummy:dummy@localhost/icaro_dev
+          export SECRET_KEY=dummy-key
+          export FIELD_ENCRYPTION_KEY=wG3Z4J... # base64 dummy
+          python manage.py makemigrations --check --dry-run
+      - name: Run Tests with Coverage
+        run: |
+          cd backend
+          export ENVIRONMENT=development
+          export EXPECTED_DATABASE=icaro_dev
+          export DATABASE_URL=postgres://dummy:dummy@localhost/icaro_dev
+          export SECRET_KEY=dummy-key
+          export FIELD_ENCRYPTION_KEY=wG3Z4J... # base64 dummy
+          coverage run -m pytest
+          coverage report --fail-under=80
+
+  frontend-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install Dependencies
+        run: |
+          cd frontend
+          npm install
+      - name: Build Expo Web
+        run: |
+          cd frontend
+          npx cross-env NODE_ENV=production expo export -p web --clear
