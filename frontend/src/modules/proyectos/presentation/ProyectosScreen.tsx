@@ -16,6 +16,7 @@ import { ProyectosTabla } from './ProyectosTabla';
 import { ProyectosFormulario } from './ProyectosFormulario';
 import { SectionTabs } from '../../../shared/components/SectionTabs';
 import { useIsMobile } from '../../../shared/hooks/useIsMobile';
+import { useLocalSearchParams } from 'expo-router';
 import { ProyectosMobileCards } from './mobile/ProyectosMobileCards';
 
 // ── Estado vacío seguro ─────────────────────────────────────────────────────
@@ -102,7 +103,17 @@ export const ProyectosScreen: React.FC = () => {
     }
   };
 
-  useEffect(() => { cargar(); }, []);
+  const params = useLocalSearchParams<{ crear?: string }>();
+
+  useEffect(() => {
+    cargar();
+  }, []);
+
+  useEffect(() => {
+    if (params.crear === 'true' && puedeCrear) {
+      setShowForm(true);
+    }
+  }, [params.crear, puedeCrear]);
 
   const handleFiltro = (e: EstadoProyecto | 'todos') => {
     setFiltro(e);

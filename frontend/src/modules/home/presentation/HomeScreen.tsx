@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, StyleSheet, Platform, useWindowDimensions } from 'react-native';
+import React, { useState, useEffect, useMemo } from 'react';
+import { View, Text, StyleSheet, Platform, useWindowDimensions, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { useAuth } from '../../auth/presentation/useAuth';
 import { useAccess } from '../../auth/presentation/useAccess';
 import { colors } from '../../../shared/constants/colors';
@@ -13,12 +13,27 @@ import { Button } from '../../../shared/components/Button';
 import { NoAssignmentsScreen } from '../../../shared/components/NoAssignmentsScreen';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { listarProyectosUseCase } from '../../../shared/dependencies';
+import { AxiosMetaRepository } from '../../proyectos/infrastructure/AxiosMetaRepository';
 
 export const HomeScreen: React.FC = () => {
   const { logout, userProfile } = useAuth();
-  const { accessProfile, isLoading: accessLoading } = useAccess();
+  const { accessProfile, isLoading: accessLoading, can } = useAccess();
   const { width } = useWindowDimensions();
   const isSplit = width >= 768;
+
+  const [proyectos, setProyectos] = useState<{ id: string; name: string }[]>([]);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [showDropdown, setShowDropdown] = useState(false);
+
+  // Metrics state
+  const [loadingMetrics, setLoadingMetrics] = useState(false);
+  const [metrics, setMetrics] = useState({
+    metasCount: 0,
+    compsCount: 0,
+    accsCount: 0,
+    averageProgress: 0,
+  });
 
   const handleLogout = async () => {
     await logout();
@@ -34,6 +49,111 @@ export const HomeScreen: React.FC = () => {
     ? 'Superadministrador'
     : accessProfile?.asignaciones[0]?.rolNombre ?? 'Usuario';
 
+  // Cargar proyectos
+  useEffect(() => {
+    const fetchProjects = async () => {
+      if (!accessProfile) return;
+      if (accessProfile.esSuperadministrador) {
+        try {
+          const res = await listarProyectosUseCase.ejecutar();
+          const mapped = res.results.map(p => ({ id: p.id, name: p.name }));
+          setProyectos(mapped);
+          if (mapped.length > 0) {
+            setSelectedProjectId(mapped[0].id);
+          }
+        } catch (e) {
+          console.error('Error fetching projects for superadmin:', e);
+        }
+      } else {
+        const unique = new Map<string, string>();
+        accessProfile.asignaciones.forEach(a => {
+          if (a.proyectoId && a.proyectoNombre) {
+            unique.set(a.proyectoId, a.proyectoNombre);
+          }
+        });
+        const list = Array.from(unique.entries()).map(([id, name]) => ({ id, name }));
+        setProyectos(list);
+        if (list.length > 0) {
+          setSelectedProjectId(list[0].id);
+        }
+      }
+    };
+    fetchProjects();
+  }, [accessProfile]);
+
+  const metaRepo = useMemo(() => new AxiosMetaRepository(), []);
+
+  // Cargar métricas del proyecto seleccionado
+  useEffect(() => {
+    if (!selectedProjectId) return;
+    const fetchMetrics = async () => {
+      setLoadingMetrics(true);
+      try {
+        const metas = await metaRepo.listar(selectedProjectId);
+        let compsCount = 0;
+        let accsCount = 0;
+        let accumProgress = 0;
+
+        await Promise.all(
+          metas.map(async (meta) => {
+            const comps = await metaRepo.listarComponentes(selectedProjectId, meta.id);
+            compsCount += comps.length;
+            await Promise.all(
+              comps.map(async (comp) => {
+                const accs = await metaRepo.listarAcciones(comp.id);
+                accsCount += accs.length;
+                accs.forEach(a => {
+                  accumProgress += a.avancePorcentaje || 0;
+                });
+              })
+            );
+          })
+        );
+
+        const averageProgress = accsCount > 0 ? Math.round(accumProgress / accsCount) : 0;
+        setMetrics({
+          metasCount: metas.length,
+          compsCount,
+          accsCount,
+          averageProgress,
+        });
+      } catch (err) {
+        console.error('Error calculating metrics:', err);
+      } finally {
+        setLoadingMetrics(false);
+      }
+    };
+    fetchMetrics();
+  }, [selectedProjectId, metaRepo]);
+
+  // Chequeos de Rol y Acción Dinámica
+  const puedeCrearProyecto = can('proyectos.crear');
+
+  const isGestorOfSelected = useMemo(() => {
+    if (accessProfile?.esSuperadministrador) return true;
+    return accessProfile?.asignaciones?.some(
+      (a) => a.proyectoId === selectedProjectId && 
+      ['superadministrador', 'administrador_proyecto', 'coordinador_proyecto', 'coordinador_general'].includes(a.rolCodigo)
+    ) ?? false;
+  }, [accessProfile, selectedProjectId]);
+
+  const handleShortcutAction = () => {
+    if (puedeCrearProyecto) {
+      router.push('/proyectos?crear=true');
+    } else if (isGestorOfSelected) {
+      router.push(`/proyectos/${selectedProjectId}`);
+    } else {
+      router.push('/mis-actividades');
+    }
+  };
+
+  const getShortcutLabel = () => {
+    if (puedeCrearProyecto) return 'Crear Proyecto';
+    if (isGestorOfSelected) return 'Agregar Componente';
+    return 'Agregar Evidencia';
+  };
+
+  const selectedProjectName = proyectos.find(p => p.id === selectedProjectId)?.name ?? 'Seleccione Proyecto';
 
   const dashboardContent = (
     <View style={styles.dashboardGrid}>
@@ -41,112 +161,139 @@ export const HomeScreen: React.FC = () => {
       <View style={isSplit ? styles.leftColumn : styles.fullWidth}>
         <WelcomeBanner username={userProfile?.username ?? 'Usuario'} />
 
-        {/* 3 MetricCards con sparklines */}
-        <View style={styles.metricsRow}>
-          <Card padding="md" style={styles.metricCard}>
-            <View style={styles.metricContent}>
-              <View style={styles.metricInfo}>
-                <Text style={styles.metricTitle}>Proyectos Activos</Text>
-                <Text style={styles.metricValue}>12</Text>
-                <Text style={styles.metricSubText}>+4% este mes</Text>
+        {/* Selector de Proyecto */}
+        {proyectos.length > 1 && (
+          <View style={styles.selectorContainer}>
+            <Text style={styles.selectorLabel}>Proyecto Activo:</Text>
+            <TouchableOpacity
+              style={styles.dropdownButton}
+              onPress={() => setShowDropdown(prev => !prev)}
+            >
+              <Text style={styles.dropdownButtonText} numberOfLines={1}>
+                {selectedProjectName}
+              </Text>
+              <Ionicons
+                name={showDropdown ? 'chevron-up-outline' : 'chevron-down-outline'}
+                size={16}
+                color={colors.primary}
+              />
+            </TouchableOpacity>
+            {showDropdown && (
+              <View style={styles.dropdownList}>
+                <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled>
+                  {proyectos.map((p) => (
+                    <TouchableOpacity
+                      key={p.id}
+                      style={[
+                        styles.dropdownItem,
+                        p.id === selectedProjectId && styles.dropdownItemActive
+                      ]}
+                      onPress={() => {
+                        setSelectedProjectId(p.id);
+                        setShowDropdown(false);
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.dropdownItemText,
+                          p.id === selectedProjectId && styles.dropdownItemTextActive
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {p.name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
               </View>
-              {/* Sparkline */}
-              <View style={styles.sparkline}>
-                <View style={[styles.sparkBar, { height: 10 }]} />
-                <View style={[styles.sparkBar, { height: 25 }]} />
-                <View style={[styles.sparkBar, { height: 15 }]} />
-                <View style={[styles.sparkBar, { height: 35 }]} />
-                <View style={[styles.sparkBar, { height: 20 }]} />
+            )}
+          </View>
+        )}
+
+        {/* Trophy Card en caso de progreso alto */}
+        {!loadingMetrics && selectedProjectId && metrics.averageProgress >= 80 && (
+          <Card padding="lg" style={styles.trophyCard}>
+            <View style={styles.trophyContent}>
+              <View style={styles.trophyIconContainer}>
+                <Ionicons name="trophy" size={36} color="#FFD700" />
+              </View>
+              <View style={styles.trophyInfo}>
+                <Text style={styles.trophyTitle}>¡Excelente Avance!</Text>
+                <Text style={styles.trophyDescription}>
+                  El proyecto "{selectedProjectName}" tiene un {metrics.averageProgress}% de ejecución de sus metas. ¡Buen trabajo!
+                </Text>
               </View>
             </View>
           </Card>
+        )}
 
-          <Card padding="md" style={styles.metricCard}>
-            <View style={styles.metricContent}>
-              <View style={styles.metricInfo}>
-                <Text style={styles.metricTitle}>Evidencias</Text>
-                <Text style={styles.metricValue}>85</Text>
-                <Text style={styles.metricSubText}>+12% esta semana</Text>
-              </View>
-              {/* Sparkline */}
-              <View style={styles.sparkline}>
-                <View style={[styles.sparkBar, { height: 15 }]} />
-                <View style={[styles.sparkBar, { height: 10 }]} />
-                <View style={[styles.sparkBar, { height: 30 }]} />
-                <View style={[styles.sparkBar, { height: 20 }]} />
-                <View style={[styles.sparkBar, { height: 40 }]} />
-              </View>
-            </View>
-          </Card>
-
-          <Card padding="md" style={styles.metricCard}>
-            <View style={styles.metricContent}>
-              <View style={styles.metricInfo}>
-                <Text style={styles.metricTitle}>Auditorías</Text>
-                <Text style={styles.metricValue}>6</Text>
-                <Text style={styles.metricSubText}>Al día</Text>
-              </View>
-              {/* Sparkline */}
-              <View style={styles.sparkline}>
-                <View style={[styles.sparkBar, { height: 30 }]} />
-                <View style={[styles.sparkBar, { height: 20 }]} />
-                <View style={[styles.sparkBar, { height: 25 }]} />
-                <View style={[styles.sparkBar, { height: 15 }]} />
-                <View style={[styles.sparkBar, { height: 35 }]} />
-              </View>
-            </View>
-          </Card>
-        </View>
-
-        {/* Fila Inferior: Donut Chart + Barras de Progreso */}
-        <View style={styles.bottomRow}>
-          {/* Actividad Reciente (Donut Chart) */}
-          <Card padding="lg" style={styles.donutCard}>
-            <Text style={styles.cardSectionTitle}>Actividad Reciente</Text>
-            <View style={styles.donutContainer}>
-              {/* Donut Chart hecho con Views */}
-              <View style={styles.donutOuter}>
-                <View style={styles.donutInner}>
-                  <Text style={styles.donutText}>95%</Text>
+        {/* Métricas Reales */}
+        {loadingMetrics ? (
+          <ActivityIndicator size="large" color={colors.primary} style={{ marginVertical: spacing.xl }} />
+        ) : selectedProjectId ? (
+          <>
+            <View style={styles.metricsRow}>
+              <Card padding="md" style={styles.metricCard}>
+                <View style={styles.metricContent}>
+                  <View style={styles.metricInfo}>
+                    <Text style={styles.metricTitle}>Metas Activas</Text>
+                    <Text style={styles.metricValue}>{metrics.metasCount}</Text>
+                    <Text style={styles.metricSubText}>En este proyecto</Text>
+                  </View>
+                  <Ionicons name="flag-outline" size={32} color={colors.primary} style={styles.metricIcon} />
                 </View>
-              </View>
-              <View style={styles.donutLegend}>
-                <Text style={styles.legendTitle}>Proyectos</Text>
-                <Text style={styles.legendDesc}>En ejecución óptima</Text>
-              </View>
-            </View>
-          </Card>
+              </Card>
 
-          {/* Avance de Planes (Barras de progreso) */}
-          <Card padding="lg" style={styles.progressCard}>
-            <Text style={styles.cardSectionTitle}>Avance de Planes</Text>
-            <View style={styles.progressList}>
-              <View style={styles.progressItem}>
-                <Text style={styles.progressLabel}>Planificación</Text>
-                <View style={styles.progressBarBg}>
-                  <View style={[styles.progressBarFill, { width: '85%', backgroundColor: colors.primary }]} />
+              <Card padding="md" style={styles.metricCard}>
+                <View style={styles.metricContent}>
+                  <View style={styles.metricInfo}>
+                    <Text style={styles.metricTitle}>Componentes</Text>
+                    <Text style={styles.metricValue}>{metrics.compsCount}</Text>
+                    <Text style={styles.metricSubText}>Estructurados</Text>
+                  </View>
+                  <Ionicons name="layers-outline" size={32} color={colors.primary} style={styles.metricIcon} />
                 </View>
-              </View>
-              <View style={styles.progressItem}>
-                <Text style={styles.progressLabel}>Ejecución</Text>
-                <View style={styles.progressBarBg}>
-                  <View style={[styles.progressBarFill, { width: '60%', backgroundColor: colors.accent }]} />
-                </View>
-              </View>
-              <View style={styles.progressItem}>
-                <Text style={styles.progressLabel}>Cierre</Text>
-                <View style={styles.progressBarBg}>
-                  <View style={[styles.progressBarFill, { width: '35%', backgroundColor: colors.success }]} />
-                </View>
-              </View>
-            </View>
-          </Card>
-        </View>
+              </Card>
 
+              <Card padding="md" style={styles.metricCard}>
+                <View style={styles.metricContent}>
+                  <View style={styles.metricInfo}>
+                    <Text style={styles.metricTitle}>Acciones</Text>
+                    <Text style={styles.metricValue}>{metrics.accsCount}</Text>
+                    <Text style={styles.metricSubText}>Registradas</Text>
+                  </View>
+                  <Ionicons name="git-commit-outline" size={32} color={colors.primary} style={styles.metricIcon} />
+                </View>
+              </Card>
+            </View>
+
+            {/* Fila Inferior: Donut Chart de Avance */}
+            <View style={styles.bottomRow}>
+              <Card padding="lg" style={styles.donutCard}>
+                <Text style={styles.cardSectionTitle}>Avance de Proyecto</Text>
+                <View style={styles.donutContainer}>
+                  <View style={styles.donutOuter}>
+                    <View style={styles.donutInner}>
+                      <Text style={styles.donutText}>{metrics.averageProgress}%</Text>
+                    </View>
+                  </View>
+                  <View style={styles.donutLegend}>
+                    <Text style={styles.legendTitle}>Ejecución General</Text>
+                    <Text style={styles.legendDesc}>Porcentaje total de cumplimiento en base a las acciones definidas.</Text>
+                  </View>
+                </View>
+              </Card>
+            </View>
+          </>
+        ) : (
+          <Text style={styles.noProjectsText}>No hay proyectos activos asignados.</Text>
+        )}
+
+        {/* Botón Dinámico de Acción */}
         <Button
-          label="Ver Proyectos"
-          onPress={() => router.push('/proyectos')}
-          style={styles.btnProyectos}
+          label={getShortcutLabel()}
+          onPress={handleShortcutAction}
+          style={styles.btnShortcut}
         />
       </View>
 
@@ -174,9 +321,9 @@ export const HomeScreen: React.FC = () => {
           <View style={styles.profileDivider} />
           <View style={styles.profileInfoList}>
             <Text style={styles.profileInfoText}>Email: {userProfile?.email ?? '—'}</Text>
-            {!accessProfile?.esSuperadministrador && accessProfile?.asignaciones[0] && (
+            {proyectos.length > 0 && (
               <Text style={styles.profileInfoText}>
-                Proyecto: {accessProfile.asignaciones[0].proyectoNombre ?? '—'}
+                Proyecto: {selectedProjectName}
               </Text>
             )}
           </View>
@@ -226,6 +373,105 @@ const styles = StyleSheet.create({
     width: '100%',
     marginBottom: spacing.lg,
   },
+  selectorContainer: {
+    marginBottom: spacing.md,
+    zIndex: 10,
+  },
+  selectorLabel: {
+    fontFamily: typography.fontFamily,
+    fontSize: typography.sizes.xs,
+    fontWeight: typography.weights.bold,
+    color: colors.textSecondary,
+    marginBottom: spacing.xs,
+  },
+  dropdownButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  dropdownButtonText: {
+    fontFamily: typography.fontFamily,
+    fontSize: typography.sizes.sm,
+    color: colors.textPrimary,
+    fontWeight: typography.weights.medium,
+    flex: 1,
+  },
+  dropdownList: {
+    position: 'absolute',
+    top: 60,
+    left: 0,
+    right: 0,
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: 8,
+    maxHeight: 200,
+    zIndex: 100,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  dropdownItem: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  dropdownItemActive: {
+    backgroundColor: 'rgba(108,85,201,0.08)',
+  },
+  dropdownItemText: {
+    fontFamily: typography.fontFamily,
+    fontSize: typography.sizes.sm,
+    color: colors.textPrimary,
+  },
+  dropdownItemTextActive: {
+    color: colors.primary,
+    fontWeight: typography.weights.bold,
+  },
+  trophyCard: {
+    backgroundColor: 'rgba(108, 85, 201, 0.05)',
+    borderColor: colors.primary,
+    borderWidth: 1,
+    marginBottom: spacing.lg,
+  },
+  trophyContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  trophyIconContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'rgba(255, 215, 0, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  trophyInfo: {
+    flex: 1,
+  },
+  trophyTitle: {
+    fontFamily: typography.fontFamily,
+    fontSize: typography.sizes.md,
+    fontWeight: typography.weights.bold,
+    color: colors.primary,
+    marginBottom: 2,
+  },
+  trophyDescription: {
+    fontFamily: typography.fontFamily,
+    fontSize: typography.sizes.xs,
+    color: colors.textSecondary,
+    lineHeight: 16,
+  },
   metricsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -236,7 +482,7 @@ const styles = StyleSheet.create({
   },
   metricCard: {
     flex: 1,
-    minWidth: 200,
+    minWidth: 150,
     backgroundColor: colors.surface,
     borderColor: colors.border,
   },
@@ -268,15 +514,8 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.xs,
     color: colors.textSecondary,
   },
-  sparkline: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    height: 40,
-    gap: 4,
-  },
-  sparkBar: {
-    width: 6,
-    backgroundColor: colors.primary,
+  metricIcon: {
+    opacity: 0.85,
   },
   bottomRow: {
     flexDirection: 'row',
@@ -287,12 +526,6 @@ const styles = StyleSheet.create({
   },
   donutCard: {
     flex: 1,
-    minWidth: 280,
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-  },
-  progressCard: {
-    flex: 1.2,
     minWidth: 280,
     backgroundColor: colors.surface,
     borderColor: colors.border,
@@ -346,32 +579,16 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.xs,
     color: colors.textSecondary,
   },
-  progressList: {
-    gap: spacing.sm,
+  btnShortcut: {
+    alignSelf: 'flex-start',
+    marginBottom: spacing.lg,
   },
-  progressItem: {
-    marginBottom: spacing.xs,
-  },
-  progressLabel: {
+  noProjectsText: {
     fontFamily: typography.fontFamily,
     fontSize: typography.sizes.sm,
     color: colors.textSecondary,
-    marginBottom: 4,
-  },
-  progressBarBg: {
-    height: 8,
-    backgroundColor: colors.border,
-    borderRadius: 4,
-    width: '100%',
-    overflow: 'hidden',
-  },
-  progressBarFill: {
-    height: '100%',
-    borderRadius: 4,
-  },
-  btnProyectos: {
-    alignSelf: 'flex-start',
-    marginBottom: spacing.lg,
+    marginVertical: spacing.xl,
+    textAlign: 'center',
   },
   profileCard: {
     backgroundColor: colors.surface,
@@ -412,11 +629,6 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.md,
     fontWeight: typography.weights.bold,
     color: colors.textPrimary,
-  },
-  profileCargo: {
-    fontFamily: typography.fontFamily,
-    fontSize: typography.sizes.xs,
-    color: colors.textSecondary,
   },
   rolBadge: {
     flexDirection: 'row',
