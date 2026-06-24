@@ -69,6 +69,10 @@ if DEBUG:
         'http://127.0.0.1:19006',
         'http://127.0.0.1:8081',
     ]
+    # También permitir orígenes adicionales de la variable de entorno en desarrollo
+    _cors_origins = os.getenv('CORS_ALLOWED_ORIGINS', '')
+    if _cors_origins:
+        CORS_ALLOWED_ORIGINS.extend([o.strip() for o in _cors_origins.split(',') if o.strip()])
 else:
     # Leer orígenes de variable de entorno separados por coma
     _cors_origins = os.getenv('CORS_ALLOWED_ORIGINS', '')
