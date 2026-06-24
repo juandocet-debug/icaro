@@ -227,10 +227,10 @@ STORAGES = {
     },
 }
 
-# Permitir archivos de hasta 6MB en memoria para que el controller
-# pueda validar el límite de 5MB con su propio mensaje de error.
-DATA_UPLOAD_MAX_MEMORY_SIZE = 6 * 1024 * 1024   # 6 MB
-FILE_UPLOAD_MAX_MEMORY_SIZE = 6 * 1024 * 1024   # 6 MB
+# Permitir archivos de hasta 52MB en memoria para que el controller
+# pueda validar el límite de 20MB o 50MB con su propio mensaje de error.
+DATA_UPLOAD_MAX_MEMORY_SIZE = 52 * 1024 * 1024   # 52 MB
+FILE_UPLOAD_MAX_MEMORY_SIZE = 52 * 1024 * 1024   # 52 MB
 
 _CLOUDINARY_URL = os.getenv('CLOUDINARY_URL', '')
 _AWS_KEY        = os.getenv('AWS_ACCESS_KEY_ID', '')

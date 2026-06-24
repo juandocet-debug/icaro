@@ -85,7 +85,7 @@ export const ProyectoHeroBanner: React.FC<ProyectoHeroBannerProps> = ({
         onChange={(e: any) => {
           const f = e.target.files?.[0];
           if (!f) return;
-          if (f.size > 5 * 1024 * 1024) return setUploadError('El archivo supera el límite de 5MB. Elegí una imagen más pequeña.');
+          if (f.size > 20 * 1024 * 1024) return setUploadError('El archivo supera el límite de 20MB. Elegí una imagen más pequeña.');
           setTempFile(f);
         }} />
     </Card>

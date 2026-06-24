@@ -124,7 +124,7 @@ export const ProyectoDetailScreen: React.FC<Props> = ({ proyectoId }) => {
       setProyecto(actualizado);
       setTempFile(null);
     } catch (e: any) {
-      setUploadError(e?.response?.data?.error || 'No se pudo subir la imagen. Verificá el formato y tamaño (máx 5MB).');
+      setUploadError(e?.response?.data?.error || 'No se pudo subir la imagen. Verificá el formato y tamaño (máx 20MB).');
     } finally {
       setUploadingPortada(false);
     }

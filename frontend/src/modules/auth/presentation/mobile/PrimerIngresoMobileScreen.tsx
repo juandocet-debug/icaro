@@ -27,8 +27,8 @@ export const PrimerIngresoMobileScreen: React.FC = () => {
       if (Platform.OS === 'web') {
         const f = e?.target?.files?.[0];
         if (!f) return;
-        if (f.size > 5 * 1024 * 1024) {
-          setError('La foto supera el límite de 5MB.');
+        if (f.size > 20 * 1024 * 1024) {
+          setError('La foto supera el límite de 20MB.');
           return;
         }
         const foto: ProfilePhoto = {

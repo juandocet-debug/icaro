@@ -48,7 +48,7 @@ def test_upload_portada_too_large_returns_400(api_client, admin_user):
     proyecto = ProyectoModel.objects.create(name="Proyecto Test", created_by=admin_user)
     api_client.force_authenticate(user=admin_user)
     
-    file = SimpleUploadedFile("cover.jpg", b"x" * (6 * 1024 * 1024), content_type="image/jpeg")
+    file = SimpleUploadedFile("cover.jpg", b"x" * (21 * 1024 * 1024), content_type="image/jpeg")
     res = api_client.patch(f'/api/proyectos/{proyecto.id}/portada/', {'portada': file}, format='multipart')
     assert res.status_code == 400
 

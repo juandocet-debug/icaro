@@ -8,7 +8,7 @@ from .throttling import PasswordChangeRateThrottle
 from PIL import Image
 
 ALLOWED_FOTO_TYPES = {'image/jpeg', 'image/jpg', 'image/png', 'image/webp'}
-MAX_FOTO_SIZE = 5 * 1024 * 1024  # 5MB
+MAX_FOTO_SIZE = 20 * 1024 * 1024  # 20MB
 
 class MiPerfilController(APIView):
     permission_classes = [IsAuthenticated]

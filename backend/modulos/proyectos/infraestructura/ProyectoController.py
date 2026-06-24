@@ -136,7 +136,7 @@ class ProyectoDetailController(APIView):
             return Response({'ok':False,'error':str(e)},status=404)
 
 ALLOWED_IMAGE_TYPES = {'image/jpeg', 'image/jpg', 'image/png', 'image/webp'}
-MAX_IMAGE_SIZE = 5 * 1024 * 1024  # 5MB
+MAX_IMAGE_SIZE = 20 * 1024 * 1024  # 20MB
 
 class ProyectoPortadaController(APIView):
     permission_classes = [IsAuthenticated, IsAdminUser]
