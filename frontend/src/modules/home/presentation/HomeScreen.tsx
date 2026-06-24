@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { View, Text, StyleSheet, Platform, useWindowDimensions, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Platform, useWindowDimensions, TouchableOpacity, ScrollView, ActivityIndicator, Image } from 'react-native';
 import { useAuth } from '../../auth/presentation/useAuth';
 import { useAccess } from '../../auth/presentation/useAccess';
 import { colors } from '../../../shared/constants/colors';
@@ -12,13 +12,16 @@ import { Card } from '../../../shared/components/Card';
 import { Button } from '../../../shared/components/Button';
 import { NoAssignmentsScreen } from '../../../shared/components/NoAssignmentsScreen';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { listarProyectosUseCase } from '../../../shared/dependencies';
 import { AxiosMetaRepository } from '../../proyectos/infrastructure/AxiosMetaRepository';
+import { ProfileEditModal } from './components/ProfileEditModal';
 
 export const HomeScreen: React.FC = () => {
   const { logout, userProfile } = useAuth();
   const { accessProfile, isLoading: accessLoading, can } = useAccess();
+  const params = useLocalSearchParams<{ perfil?: string }>();
+  const [showProfileModal, setShowProfileModal] = useState(false);
   const { width } = useWindowDimensions();
   const isSplit = width >= 768;
 
@@ -38,6 +41,12 @@ export const HomeScreen: React.FC = () => {
   const handleLogout = async () => {
     await logout();
   };
+
+  useEffect(() => {
+    if (params.perfil === 'true') {
+      setShowProfileModal(true);
+    }
+  }, [params.perfil]);
 
   // Usuario sin proyectos y no superadmin
   if (!accessLoading && accessProfile && !accessProfile.esSuperadministrador && accessProfile.asignaciones.length === 0) {
@@ -303,13 +312,21 @@ export const HomeScreen: React.FC = () => {
         <Card padding="lg" style={styles.profileCard}>
           <Text style={styles.profileHeaderTitle}>Mi Perfil</Text>
           <View style={styles.avatarRow}>
-            <View style={styles.avatarCircle}>
-              <Text style={styles.avatarInitial}>
-                {userProfile?.username ? userProfile.username.charAt(0).toUpperCase() : 'U'}
-              </Text>
+            <View style={[styles.avatarCircle, { overflow: 'hidden' }]}>
+              {userProfile?.photoUrl ? (
+                <Image source={{ uri: userProfile.photoUrl }} style={styles.avatarImg} />
+              ) : (
+                <Text style={styles.avatarInitial}>
+                  {userProfile?.username ? userProfile.username.charAt(0).toUpperCase() : 'U'}
+                </Text>
+              )}
             </View>
             <View style={styles.profileDetails}>
-              <Text style={styles.profileName}>{userProfile?.username ?? 'Usuario'}</Text>
+              <Text style={styles.profileName} numberOfLines={1}>
+                {userProfile?.primerNombre 
+                  ? `${userProfile.primerNombre} ${userProfile.primerApellido ?? ''}`.trim()
+                  : userProfile?.username ?? 'Usuario'}
+              </Text>
               <View style={styles.rolBadge}>
                 {accessProfile?.esSuperadministrador && (
                   <Ionicons name="shield-checkmark" size={12} color={colors.primary} />
@@ -327,12 +344,20 @@ export const HomeScreen: React.FC = () => {
               </Text>
             )}
           </View>
-          <Button
-            label="Cerrar Sesión"
-            variant="ghost"
-            onPress={handleLogout}
-            style={styles.btnLogout}
-          />
+          <View style={styles.profileActionsRow}>
+            <Button
+              label="Editar Perfil"
+              variant="secondary"
+              onPress={() => setShowProfileModal(true)}
+              style={{ flex: 1 }}
+            />
+            <Button
+              label="Cerrar Sesión"
+              variant="ghost"
+              onPress={handleLogout}
+              style={{ flex: 1 }}
+            />
+          </View>
         </Card>
 
         {/* Calendario */}
@@ -344,6 +369,7 @@ export const HomeScreen: React.FC = () => {
   return (
     <AppShell scrollable={true} style={styles.shell}>
       {dashboardContent}
+      <ProfileEditModal visible={showProfileModal} onClose={() => setShowProfileModal(false)} />
     </AppShell>
   );
 };
@@ -615,6 +641,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  avatarImg: {
+    width: '100%',
+    height: '100%',
+  },
   avatarInitial: {
     fontFamily: typography.fontFamily,
     fontSize: typography.sizes.lg,
@@ -656,7 +686,9 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.sm,
     color: colors.textSecondary,
   },
-  btnLogout: {
-    alignSelf: 'flex-start',
+  profileActionsRow: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    width: '100%',
   },
 });

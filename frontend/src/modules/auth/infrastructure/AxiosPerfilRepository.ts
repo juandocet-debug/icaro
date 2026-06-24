@@ -14,6 +14,10 @@ export class AxiosPerfilRepository implements UserProfileRepositoryPort {
         cedula: string | null; telefono: string | null; cargo: string | null;
         organizacion_id: string | null; is_staff: boolean;
         must_change_password: boolean; photo_url: string | null;
+        primer_nombre: string | null;
+        segundo_nombre: string | null;
+        primer_apellido: string | null;
+        segundo_apellido: string | null;
       };
     }>('/api/auth/perfil/');
     const d = res.data.datos;
@@ -22,7 +26,22 @@ export class AxiosPerfilRepository implements UserProfileRepositoryPort {
       cedula: d.cedula, telefono: d.telefono, cargo: d.cargo,
       organizacionId: d.organizacion_id, isStaff: d.is_staff,
       mustChangePassword: d.must_change_password, photoUrl: d.photo_url,
+      primerNombre: d.primer_nombre,
+      segundoNombre: d.segundo_nombre,
+      primerApellido: d.primer_apellido,
+      segundoApellido: d.segundo_apellido,
     };
+  }
+
+  async actualizarPerfil(datos: Partial<UserProfile>): Promise<void> {
+    await api.patch('/api/auth/perfil/', {
+      primer_nombre: datos.primerNombre,
+      segundo_nombre: datos.segundoNombre,
+      primer_apellido: datos.primerApellido,
+      segundo_apellido: datos.segundoApellido,
+      telefono: datos.telefono,
+      cargo: datos.cargo,
+    });
   }
 
   async cambiarClave(nuevaClave: string, claveActual?: string): Promise<void> {

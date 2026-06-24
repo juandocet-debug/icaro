@@ -39,6 +39,10 @@ class MiPerfilController(APIView):
             'organizacion_id': str(perfil.organizacion_id) if perfil.organizacion_id else None,
             'must_change_password': perfil.must_change_password,
             'photo_url': photo_url,
+            'primer_nombre': perfil.primer_nombre,
+            'segundo_nombre': perfil.segundo_nombre,
+            'primer_apellido': perfil.primer_apellido,
+            'segundo_apellido': perfil.segundo_apellido,
         }}, status=200)
 
     def patch(self, request):
@@ -48,10 +52,18 @@ class MiPerfilController(APIView):
                 user_id=request.user.id,
                 telefono=request.data.get('telefono'),
                 cargo=request.data.get('cargo'),
-                organizacion_id=request.data.get('organizacion_id'))
+                organizacion_id=request.data.get('organizacion_id'),
+                primer_nombre=request.data.get('primer_nombre'),
+                segundo_nombre=request.data.get('segundo_nombre'),
+                primer_apellido=request.data.get('primer_apellido'),
+                segundo_apellido=request.data.get('segundo_apellido'))
             return Response({'ok': True, 'datos': {
                 'telefono': perfil.telefono, 'cargo': perfil.cargo,
-                'organizacion_id': perfil.organizacion_id}}, status=200)
+                'organizacion_id': perfil.organizacion_id,
+                'primer_nombre': perfil.primer_nombre,
+                'segundo_nombre': perfil.segundo_nombre,
+                'primer_apellido': perfil.primer_apellido,
+                'segundo_apellido': perfil.segundo_apellido}}, status=200)
         except ValueError as e:
             return Response({'ok': False, 'error': str(e)}, status=400)
 

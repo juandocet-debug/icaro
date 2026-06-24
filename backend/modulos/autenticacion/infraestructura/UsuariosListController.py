@@ -57,7 +57,7 @@ def _s(u, request=None):
 
 class UsuariosListController(APIView):
     permission_classes = [IsAuthenticated]
-    pagination_class = __import__('rest_framework.settings', fromlist=['api_settings']).api_settings.DEFAULT_PAGINATION_CLASS
+    pagination_class = None
 
     def get(self, request):
         if not (request.user.is_staff or request.user.is_superuser):
@@ -84,10 +84,6 @@ class UsuariosListController(APIView):
                 Q(profile__primer_nombre__icontains=q) | Q(profile__primer_apellido__icontains=q)
             )
 
-        paginator = self.pagination_class()
-        page = paginator.paginate_queryset(qs, request, view=self)
-        if page is not None:
-            return paginator.get_paginated_response([_s(u, request) for u in page])
         return Response({'ok': True, 'datos': [_s(u, request) for u in qs]}, status=200)
 
     def post(self, request):

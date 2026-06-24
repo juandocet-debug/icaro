@@ -10,6 +10,7 @@ def _serializar(s) -> dict:
     return {
         'id': str(s.id),
         'usuario_id': s.usuario_id,
+        'token_jti': s.token_jti,
         'ip_address': s.ip_address,
         'user_agent': s.user_agent,
         'created_at': str(s.created_at) if s.created_at else None

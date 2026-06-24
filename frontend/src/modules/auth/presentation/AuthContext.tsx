@@ -21,6 +21,7 @@ interface AuthContextType {
   userProfile: UserProfile | null;
   completarPrimerIngreso: (nuevaClave: string) => Promise<void>;
   actualizarFotoPerfil: (foto: ProfilePhoto) => Promise<void>;
+  actualizarPerfil: (datos: Partial<UserProfile>) => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -111,6 +112,20 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
+  const actualizarPerfil = async (datos: Partial<UserProfile>) => {
+    setIsLoading(true);
+    try {
+      await perfilRepository.actualizarPerfil(datos);
+      const perfil = await obtenerPerfilUseCase.ejecutar();
+      setUserProfile(perfil);
+    } catch (e: any) {
+      setError(e.message || 'Error al actualizar el perfil.');
+      throw e;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const clearError = () => {
     setError(null);
   };
@@ -118,7 +133,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   return (
     <AuthContext.Provider value={{
       isAuthenticated, isLoading, login, logout, error, clearError,
-      userProfile, completarPrimerIngreso, actualizarFotoPerfil
+      userProfile, completarPrimerIngreso, actualizarFotoPerfil, actualizarPerfil
     }}>
       {children}
     </AuthContext.Provider>

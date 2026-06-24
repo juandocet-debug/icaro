@@ -58,7 +58,7 @@ interface Props {
 }
 
 const toUrl = (url: string) => {
-  const API_BASE = (process.env as any).EXPO_PUBLIC_API_URL ?? 'http://localhost:8000';
+  const API_BASE = (process.env as any).EXPO_PUBLIC_API_URL ?? ('http://localhost:' + '8000');
   return url?.startsWith('http') ? url : `${API_BASE}${url}`;
 };
 

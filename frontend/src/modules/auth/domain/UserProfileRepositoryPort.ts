@@ -5,4 +5,5 @@ export interface UserProfileRepositoryPort {
   obtenerPerfil(): Promise<UserProfile>;
   cambiarClave(nuevaClave: string, claveActual?: string): Promise<void>;
   subirFoto(foto: ProfilePhoto): Promise<string>;
+  actualizarPerfil(datos: Partial<UserProfile>): Promise<void>;
 }

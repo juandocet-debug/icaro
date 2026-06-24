@@ -13,13 +13,15 @@ export const MobileBottomTabs: React.FC = () => {
     { label: 'Proyectos', icon: 'folder-open-outline', iconActive: 'folder-open', route: '/proyectos' },
     { label: 'Agregar', icon: 'add-circle', iconActive: 'add-circle', route: '/proyectos', isSpecial: true },
     { label: 'Actividades', icon: 'clipboard-outline', iconActive: 'clipboard', route: '/mis-actividades' },
-    { label: 'Perfil', icon: 'person-outline', iconActive: 'person', route: '/mis-actividades' }, // Enlace al perfil como placeholder
+    { label: 'Perfil', icon: 'person-outline', iconActive: 'person', route: '/?perfil=true' },
   ];
 
   return (
     <View style={styles.container}>
       {navs.map((n) => {
-        const isActive = pathname === n.route || (n.route !== '/' && pathname.startsWith(n.route));
+        const isActive = pathname === n.route || 
+          (n.route === '/?perfil=true' && pathname === '/') || 
+          (n.route !== '/' && n.route !== '/?perfil=true' && pathname.startsWith(n.route));
 
         if (n.isSpecial) {
           return (

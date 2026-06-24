@@ -175,48 +175,52 @@ export const ProyectosScreen: React.FC = () => {
       {/* Contenido */}
       {loading ? (
         <ActivityIndicator size="large" color={colors.primary} style={screenStyles.loader} />
-      ) : error ? null : proyectos.length === 0 ? (
-        // Lista vacía: estado neutro y seguro, sin tabla vacía ni filtros inútiles
-        <EmptyProjectsState />
-      ) : (
+      ) : error ? null : (
         <>
-          {/* Filtros — homologados con la estética de la sección de seguridad */}
-          <SectionTabs
-            items={[
-              { id: 'todos', label: 'Todos', icon: 'grid-outline' },
-              { id: 'activo', label: 'Activo', icon: 'play-circle-outline' },
-              { id: 'completado', label: 'Completado', icon: 'checkmark-circle-outline' },
-              { id: 'inactivo', label: 'Inactivo', icon: 'pause-circle-outline' },
-              { id: 'suspendido', label: 'Suspendido', icon: 'alert-circle-outline' },
-            ]}
-            activeId={filtro}
-            onChange={(id) => handleFiltro(id as any)}
-          />
+          {(puedeCrear || proyectos.length > 0) && (
+            <View style={screenStyles.sectionHeaderBar}>
+              <Text style={screenStyles.sectionTitle}>Gestión de Proyectos</Text>
+              {puedeCrear && (
+                <Button
+                  label={showForm ? 'Cancelar' : '+ Nuevo Proyecto'}
+                  variant={showForm ? 'secondary' : 'primary'}
+                  onPress={() => { setShowForm(v => !v); setFormError(null); }}
+                />
+              )}
+            </View>
+          )}
 
-          {/* Barra de cabecera de sección con botón de acción abajo de pestañas */}
-          <View style={screenStyles.sectionHeaderBar}>
-            <Text style={screenStyles.sectionTitle}>Gestión de Proyectos</Text>
-            {puedeCrear && (
-              <Button
-                label={showForm ? 'Cancelar' : '+ Nuevo Proyecto'}
-                variant={showForm ? 'secondary' : 'primary'}
-                onPress={() => { setShowForm(v => !v); setFormError(null); }}
-              />
-            )}
-          </View>
-
-          {isMobile ? (
-            <ProyectosMobileCards
-              proyectos={filtrados}
-              expandedId={expandedId}
-              onExpandRow={setExpandedId}
-            />
+          {proyectos.length === 0 ? (
+            <EmptyProjectsState />
           ) : (
-            <ProyectosTabla
-              proyectos={filtrados}
-              expandedId={expandedId}
-              onExpandRow={setExpandedId}
-            />
+            <>
+              {/* Filtros — homologados con la estética de la sección de seguridad */}
+              <SectionTabs
+                items={[
+                  { id: 'todos', label: 'Todos', icon: 'grid-outline' },
+                  { id: 'activo', label: 'Activo', icon: 'play-circle-outline' },
+                  { id: 'completado', label: 'Completado', icon: 'checkmark-circle-outline' },
+                  { id: 'inactivo', label: 'Inactivo', icon: 'pause-circle-outline' },
+                  { id: 'suspendido', label: 'Suspendido', icon: 'alert-circle-outline' },
+                ]}
+                activeId={filtro}
+                onChange={(id) => handleFiltro(id as any)}
+              />
+
+              {isMobile ? (
+                <ProyectosMobileCards
+                  proyectos={filtrados}
+                  expandedId={expandedId}
+                  onExpandRow={setExpandedId}
+                />
+              ) : (
+                <ProyectosTabla
+                  proyectos={filtrados}
+                  expandedId={expandedId}
+                  onExpandRow={setExpandedId}
+                />
+              )}
+            </>
           )}
         </>
       )}

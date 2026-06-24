@@ -251,6 +251,16 @@ if _CLOUDINARY_URL:
 
 elif _AWS_KEY:
     # ── Cloudflare R2 / AWS S3 (fallback si no hay Cloudinary) ───────────────
+    _secret = os.getenv('AWS_SECRET_ACCESS_KEY')
+    _bucket = os.getenv('AWS_STORAGE_BUCKET_NAME')
+    _endpoint = os.getenv('AWS_S3_ENDPOINT_URL')
+    if not all([_secret, _bucket, _endpoint]):
+        _faltantes = []
+        if not _secret: _faltantes.append('AWS_SECRET_ACCESS_KEY')
+        if not _bucket: _faltantes.append('AWS_STORAGE_BUCKET_NAME')
+        if not _endpoint: _faltantes.append('AWS_S3_ENDPOINT_URL')
+        raise ImproperlyConfigured(f"Faltan credenciales: {', '.join(_faltantes)}")
+
     STORAGES["default"]["BACKEND"] = 'storages.backends.s3boto3.S3Boto3Storage'
     AWS_ACCESS_KEY_ID       = _AWS_KEY
     AWS_SECRET_ACCESS_KEY   = os.getenv('AWS_SECRET_ACCESS_KEY')

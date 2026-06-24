@@ -10,4 +10,8 @@ export interface UserProfile {
   isStaff: boolean;
   mustChangePassword: boolean;
   photoUrl: string | null;
+  primerNombre: string | null;
+  segundoNombre: string | null;
+  primerApellido: string | null;
+  segundoApellido: string | null;
 }

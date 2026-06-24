@@ -14,5 +14,7 @@ def suppress_py314_django_logging_bug():
     intenta renderizar la traza del error como plantilla, lo cual invoca el bug.
     Silenciar el emit del handler no afecta la respuesta HTTP real del test.
     """
+    from django.core.cache import cache
+    cache.clear()
     with patch('django.utils.log.AdminEmailHandler.emit', return_value=None):
         yield
