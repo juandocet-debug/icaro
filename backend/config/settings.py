@@ -271,6 +271,8 @@ elif _AWS_KEY:
     AWS_S3_FILE_OVERWRITE   = False
     AWS_S3_OBJECT_PARAMETERS = {'CacheControl': 'max-age=86400, public'}
     AWS_QUERYSTRING_AUTH    = False
+    AWS_S3_REGION_NAME      = 'auto'
+    AWS_S3_SIGNATURE_VERSION = 's3v4'
 
 elif ENVIRONMENT == 'production':
     raise ImproperlyConfigured(
