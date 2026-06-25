@@ -9,7 +9,7 @@ import { colors } from '../../../shared/constants/colors';
 import { spacing } from '../../../shared/constants/spacing';
 import { typography } from '../../../shared/constants/typography';
 import { Meta } from '../domain/Meta';
-import { eliminarMetaUseCase, listarMetasProyectoUseCase } from '../../../shared/dependencies';
+import { eliminarMetaUseCase, listarMetasProyectoUseCase, listarComponentesProyectoUseCase } from '../../../shared/dependencies';
 import { CrearMetaModal } from './CrearMetaModal';
 import { EditarMetaModal } from './EditarMetaModal';
 import { ConfirmarEliminarModal } from './ConfirmarEliminarModal';
@@ -41,6 +41,25 @@ export const ProyectoMetasComponentes: React.FC<Props> = ({ proyectoId, isAdmin 
   /** Puede eliminar metas: solo Superadmin */
   const puedeEliminarMeta = isSuperAdmin;
 
+  // Detectar si el usuario ES coordinador de componente (sin rol superior)
+  const tieneRolSuperior = isSuperAdmin || (accessProfile?.asignaciones?.some(
+    (a) => a.proyectoId === proyectoId &&
+    ['superadministrador', 'administrador_proyecto', 'coordinador_proyecto', 'coordinador_general'].includes(a.rolCodigo)
+  ) ?? false);
+
+  const esCoordinadorComponenteRestringido = !tieneRolSuperior && (accessProfile?.asignaciones?.some(
+    (a) => a.proyectoId === proyectoId && a.rolCodigo === 'coordinador_componente'
+  ) ?? false);
+
+  // IDs de los componentes asignados al usuario (puede haber varios)
+  const componentesAsignadosIds = useMemo(() => {
+    if (!accessProfile) return [] as string[];
+    return accessProfile.asignaciones
+      .filter((a) => a.proyectoId === proyectoId && a.rolCodigo === 'coordinador_componente')
+      .map((a) => a.componenteId)
+      .filter(Boolean) as string[];
+  }, [accessProfile, proyectoId]);
+
   // Paginación
   const [pagina, setPagina] = useState(1);
   const metasPorPagina = 5;
@@ -57,7 +76,26 @@ export const ProyectoMetasComponentes: React.FC<Props> = ({ proyectoId, isAdmin 
     try {
       setLoading(true); setError(null);
       const data = await listarMetasProyectoUseCase.ejecutar(proyectoId);
-      setMetas(data.filter(m => m.activo));
+      const activas = data.filter(m => m.activo);
+
+      if (esCoordinadorComponenteRestringido && componentesAsignadosIds.length > 0) {
+        // Cargar componentes del proyecto para saber a qué metas pertenecen
+        // los componentes asignados al usuario
+        const todosComponentes = await listarComponentesProyectoUseCase.ejecutar(proyectoId);
+
+        // Obtener los metaIds de los componentes asignados
+        const metaIdsAsignados = new Set(
+          todosComponentes
+            .filter(c => componentesAsignadosIds.includes(c.id))
+            .map(c => c.metaId)
+            .filter(Boolean) as string[]
+        );
+
+        // Solo mostrar las metas que contienen componentes asignados
+        setMetas(activas.filter(m => metaIdsAsignados.has(m.id)));
+      } else {
+        setMetas(activas);
+      }
     } catch {
       setError('Error al cargar las metas del proyecto.');
     } finally {
@@ -65,7 +103,9 @@ export const ProyectoMetasComponentes: React.FC<Props> = ({ proyectoId, isAdmin 
     }
   };
 
-  useEffect(() => { cargar(); }, [proyectoId]);
+  useEffect(() => { cargar(); }, [proyectoId, esCoordinadorComponenteRestringido, componentesAsignadosIds.join(',')]);
+
+
 
   const eliminarMeta = async (metaId: string) => {
     setEliminandoMetaId(metaId);
