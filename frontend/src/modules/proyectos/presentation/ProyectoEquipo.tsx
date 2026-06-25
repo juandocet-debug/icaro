@@ -67,7 +67,7 @@ export const ProyectoEquipo: React.FC<Props> = ({ proyectoId, isAdmin }) => {
       
       const [miembrosList, rolesList] = await Promise.all([
         listarMiembrosUseCase.ejecutar(proyectoId),
-        listarRolesActivosUseCase.ejecutar(),
+        isAdmin ? listarRolesActivosUseCase.ejecutar() : Promise.resolve([]),
       ]);
 
       setMiembros(miembrosList);

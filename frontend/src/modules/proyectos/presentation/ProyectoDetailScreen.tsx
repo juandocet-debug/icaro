@@ -91,6 +91,10 @@ export const ProyectoDetailScreen: React.FC<Props> = ({ proyectoId }) => {
   const isAdmin = userProfile?.isStaff ?? false;
   const canEdit = isGestor || isAdmin;
   const canVerEquipo = isSuperAdmin || canInProject('miembros.ver', proyectoId);
+  const canManageEquipo = isSuperAdmin || canInProject('miembros.asignar', proyectoId);
+  const showMisActividades = accessProfile?.asignaciones?.some(
+    (a) => a.proyectoId === proyectoId && a.rolCodigo === 'profesional_carga'
+  ) ?? false;
 
   useEffect(() => {
     const cargar = async () => {
@@ -315,7 +319,7 @@ export const ProyectoDetailScreen: React.FC<Props> = ({ proyectoId }) => {
       {/* Contenedor de Estructura / Metas / Actividades */}
       {isMobile ? (
         <View style={{ gap: spacing.lg }}>
-          {!isGestor && (
+          {showMisActividades && (
             <CollaboratorActivities
               misActividades={misActividades}
               loadingActs={loadingActs}
@@ -324,12 +328,12 @@ export const ProyectoDetailScreen: React.FC<Props> = ({ proyectoId }) => {
             />
           )}
           <ProyectoMetasComponentes proyectoId={proyectoId} isAdmin={canEdit} />
-          {canVerEquipo && <ProyectoEquipo proyectoId={proyectoId} isAdmin={canEdit} />}
+          {canVerEquipo && <ProyectoEquipo proyectoId={proyectoId} isAdmin={canManageEquipo} />}
         </View>
       ) : (
         <View style={{ flexDirection: 'row', gap: spacing.lg, alignItems: 'flex-start', width: '100%' }}>
           <View style={{ flex: 1.6, gap: spacing.lg }}>
-            {!isGestor ? (
+            {showMisActividades ? (
               <ProyectoActividadesTabla
                 misActividades={misActividades}
                 actsSearch={actsSearch}
@@ -338,12 +342,12 @@ export const ProyectoDetailScreen: React.FC<Props> = ({ proyectoId }) => {
                 isMobile={false}
               />
             ) : (
-              canVerEquipo && <ProyectoEquipo proyectoId={proyectoId} isAdmin={canEdit} />
+              canVerEquipo && <ProyectoEquipo proyectoId={proyectoId} isAdmin={canManageEquipo} />
             )}
           </View>
           <View style={{ flex: 1, minWidth: 240, gap: spacing.lg }}>
             <ProyectoMetasComponentes proyectoId={proyectoId} isAdmin={canEdit} />
-            {!isGestor && canVerEquipo && <ProyectoEquipo proyectoId={proyectoId} isAdmin={canEdit} />}
+            {showMisActividades && canVerEquipo && <ProyectoEquipo proyectoId={proyectoId} isAdmin={canManageEquipo} />}
           </View>
         </View>
       )}

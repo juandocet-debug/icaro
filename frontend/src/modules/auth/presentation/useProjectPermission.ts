@@ -39,11 +39,15 @@ export function useProjectPermission(proyectoId: string | null | undefined): Pro
     if (profile.esSuperadministrador) return true;
     if (!proyectoId) return false;
 
-    const tienePermiso = profile.permisos.some(p => p.codigo === permiso);
-    const tieneAsignacion = profile.asignaciones.some(
-      a => a.proyectoId === proyectoId
+    // Permitir si tiene el permiso con alcance global
+    if (profile.permisos.some(p => p.codigo === permiso && p.alcance === 'global')) {
+      return true;
+    }
+
+    // Si no, verificar si alguna asignación en el proyecto tiene el permiso
+    return profile.asignaciones.some(
+      a => a.proyectoId === proyectoId && a.permisos?.includes(permiso)
     );
-    return tienePermiso && tieneAsignacion;
   }, [profile, loading, proyectoId]);
 
   return { canDo, loading };
