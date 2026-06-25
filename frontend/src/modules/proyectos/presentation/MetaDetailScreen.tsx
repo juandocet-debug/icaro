@@ -355,12 +355,18 @@ export const MetaDetailScreen: React.FC<Props> = ({ proyectoId, metaId }) => {
         obtenerMetaUseCase.ejecutar(proyectoId, metaId),
         listarComponentesMetaUseCase.ejecutar(proyectoId, metaId),
       ]);
-      setMeta(m);
-      setComponentes(comps);
+      
+      // Filtrar componentes si el usuario está restringido
+      const filteredComps = esCoordinadorComponenteRestringido
+        ? comps.filter(c => componentesAsignadosIds.includes(c.id))
+        : comps;
 
-      // Auto-expandir todos los componentes para que las acciones se muestren por defecto
+      setMeta(m);
+      setComponentes(filteredComps);
+
+      // Auto-expandir todos los componentes filtrados para que las acciones se muestren por defecto
       const initialExpanded: Record<string, boolean> = {};
-      comps.forEach(c => {
+      filteredComps.forEach(c => {
         initialExpanded[c.id] = true;
       });
       setExpanded(prev => ({ ...initialExpanded, ...prev }));
@@ -419,7 +425,7 @@ export const MetaDetailScreen: React.FC<Props> = ({ proyectoId, metaId }) => {
     } finally {
       if (showLoader) setLoading(false);
     }
-  }, [proyectoId, metaId]);
+  }, [proyectoId, metaId, esCoordinadorComponenteRestringido, componentesAsignadosIds]);
 
   // Guardar posiciones automáticamente al cambiar
   useEffect(() => {

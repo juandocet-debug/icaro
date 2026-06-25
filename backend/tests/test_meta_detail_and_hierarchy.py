@@ -280,7 +280,7 @@ def test_post_componente_sin_permiso(client, superuser, proy_a, meta_a):
 def test_post_accion_sin_permiso_metas_crear(client, superuser, proy_a, meta_a):
     comp = ComponenteModel.objects.create(project=proy_a, meta=meta_a, name='Comp T64c')
     coord = User.objects.create_user(username='t64_coord2', password='pass')
-    asignar(coord, proy_a, 'coordinador_proyecto')  # tiene componentes.ver pero no metas.crear
+    asignar(coord, proy_a, 'verificador')  # tiene componentes.ver pero no acciones.crear
 
     client.force_authenticate(user=coord)
     res = client.post(
@@ -289,5 +289,5 @@ def test_post_accion_sin_permiso_metas_crear(client, superuser, proy_a, meta_a):
         format='json'
     )
     assert res.status_code == 403, (
-        f'coordinador_proyecto no debe poder crear acciones sin metas.crear; obtuvo {res.status_code}'
+        f'verificador no debe poder crear acciones; obtuvo {res.status_code}'
     )

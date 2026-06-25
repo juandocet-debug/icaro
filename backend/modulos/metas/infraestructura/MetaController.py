@@ -60,8 +60,38 @@ class MetaListCreateController(APIView):
             return Response({'ok': False, 'error': str(exc)}, status=404)
         except PermissionError as exc:
             return Response({'ok': False, 'error': str(exc)}, status=403)
+
+        # Filtrar metas si el usuario está restringido al alcance de componente
+        is_restricted = False
+        assigned_component_ids = []
+        if not request.user.is_superuser:
+            from modulos.roles.infraestructura.models import UsuarioRolModel
+            project_asigs = UsuarioRolModel.objects.filter(
+                usuario=request.user,
+                proyecto_id=proyecto_id,
+                activo=True,
+                rol__activo=True,
+                rol__tipo_alcance__in=['global', 'proyecto'],
+                rol__permisos_rel__permiso__codigo='metas.ver'
+            )
+            if not project_asigs.exists():
+                comp_asigs = UsuarioRolModel.objects.filter(
+                    usuario=request.user,
+                    proyecto_id=proyecto_id,
+                    activo=True,
+                    rol__activo=True,
+                    rol__tipo_alcance='componente',
+                    rol__permisos_rel__permiso__codigo='metas.ver'
+                )
+                if comp_asigs.exists():
+                    is_restricted = True
+                    assigned_component_ids = list(comp_asigs.values_list('componente_id', flat=True))
+
         repo = DjangoMetaRepository()
         metas_qs = repo.listar_por_proyecto_con_conteos(proyecto_id)
+        if is_restricted:
+            metas_qs = metas_qs.filter(componentes__id__in=assigned_component_ids).distinct()
+
         return Response({'ok': True, 'datos': [_s_list(m) for m in metas_qs]})
 
     def post(self, request, proyecto_id):
@@ -83,6 +113,31 @@ class MetaDetailController(APIView):
     def get(self, request, proyecto_id, meta_id):
         try:
             meta = _meta_access(meta_id, proyecto_id, request.user, 'metas.ver')
+            
+            # Validar alcance de componente
+            if not request.user.is_superuser:
+                from modulos.roles.infraestructura.models import UsuarioRolModel
+                project_asigs = UsuarioRolModel.objects.filter(
+                    usuario=request.user,
+                    proyecto_id=proyecto_id,
+                    activo=True,
+                    rol__activo=True,
+                    rol__tipo_alcance__in=['global', 'proyecto'],
+                    rol__permisos_rel__permiso__codigo='metas.ver'
+                )
+                if not project_asigs.exists():
+                    comp_asigs = UsuarioRolModel.objects.filter(
+                        usuario=request.user,
+                        proyecto_id=proyecto_id,
+                        activo=True,
+                        rol__activo=True,
+                        rol__tipo_alcance='componente',
+                        rol__permisos_rel__permiso__codigo='metas.ver'
+                    )
+                    if comp_asigs.exists():
+                        assigned_component_ids = list(comp_asigs.values_list('componente_id', flat=True))
+                        if not meta.componentes.filter(id__in=assigned_component_ids).exists():
+                            return Response({'ok': False, 'error': 'No tiene acceso a esta meta.'}, status=403)
         except ValueError as exc:
             return Response({'ok': False, 'error': str(exc)}, status=404)
         except PermissionError as exc:
