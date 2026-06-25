@@ -181,23 +181,37 @@ class ProyectoStatsController(APIView):
         except PermissionError as e:
             return Response({'ok': False, 'error': str(e)}, status=403)
 
-        from modulos.metas.infraestructura.models import MetaModel
-        from modulos.componentes.infraestructura.models import ComponenteModel
-        from modulos.acciones.infraestructura.models import AccionModel
-        from django.db.models import Avg
+        try:
+            from modulos.metas.infraestructura.models import MetaModel
+            from modulos.componentes.infraestructura.models import ComponenteModel
+            from modulos.acciones.infraestructura.models import AccionModel
+            from django.db.models import Sum
 
-        metas_count = MetaModel.objects.filter(proyecto_id=proyecto_id, activo=True).count()
-        componentes_count = ComponenteModel.objects.filter(project_id=proyecto_id).count()
-        acciones_qs = AccionModel.objects.filter(component__project_id=proyecto_id)
-        acciones_count = acciones_qs.count()
-        avg_progress = acciones_qs.aggregate(Avg('avance_porcentaje'))['avance_porcentaje__avg'] or 0
+            metas_count = MetaModel.objects.filter(proyecto_id=proyecto_id, activo=True).count()
+            componentes_count = ComponenteModel.objects.filter(project_id=proyecto_id).count()
+            acciones_qs = AccionModel.objects.filter(component__project_id=proyecto_id)
+            acciones_count = acciones_qs.count()
 
-        return Response({
-            'ok': True,
-            'datos': {
-                'metasCount': metas_count,
-                'compsCount': componentes_count,
-                'accsCount': acciones_count,
-                'averageProgress': round(avg_progress, 2)
-            }
-        }, status=200)
+            # Calcular porcentaje promedio desde ejecucion_acumulada / proyeccion_cuantitativa
+            totals = acciones_qs.aggregate(
+                total_proyeccion=Sum('proyeccion_cuantitativa'),
+                total_ejecucion=Sum('ejecucion_acumulada'),
+            )
+            proy = totals['total_proyeccion'] or 0
+            ejec = totals['total_ejecucion'] or 0
+            avg_progress = round((float(ejec) / float(proy)) * 100, 2) if proy > 0 else 0
+
+            return Response({
+                'ok': True,
+                'datos': {
+                    'metasCount': metas_count,
+                    'compsCount': componentes_count,
+                    'accsCount': acciones_count,
+                    'averageProgress': avg_progress,
+                }
+            }, status=200)
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error('Error en ProyectoStatsController: %s', str(e), exc_info=True)
+            return Response({'ok': False, 'error': 'Error interno al calcular estadísticas.'}, status=500)
+

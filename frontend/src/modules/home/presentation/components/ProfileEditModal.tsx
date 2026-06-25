@@ -163,7 +163,11 @@ export const ProfileEditModal: React.FC<Props> = ({ visible, onClose }) => {
                     <ActivityIndicator size="small" color={colors.primary} />
                   </View>
                 ) : userProfile?.photoUrl ? (
-                  <Image source={{ uri: userProfile.photoUrl }} style={styles.avatarImg} />
+                  <Image
+                    key={userProfile.photoUrl}
+                    source={{ uri: userProfile.photoUrl }}
+                    style={styles.avatarImg}
+                  />
                 ) : (
                   <View style={styles.avatarPlaceholder}>
                     <Text style={styles.avatarInitialText}>{avatarInitial}</Text>

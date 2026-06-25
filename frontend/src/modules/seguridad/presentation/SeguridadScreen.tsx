@@ -198,7 +198,7 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch',
   },
   scrollContainer: {
-    padding: Platform.select({ web: spacing.xl, default: spacing.md }),
+    padding: Platform.select({ web: spacing.lg, default: spacing.md }),
     alignItems: 'stretch',
     alignSelf: 'stretch',
   },

@@ -147,7 +147,7 @@ export const HomeScreen: React.FC = () => {
   const selectedProjectName = proyectos.find(p => p.id === selectedProjectId)?.name ?? 'Seleccione Proyecto';
 
   const dashboardContent = (
-    <View style={styles.dashboardGrid}>
+    <View style={[styles.dashboardGrid, { flexDirection: isSplit ? 'row' : 'column' }]}>
       {/* Columna Izquierda (65% en Web) */}
       <View style={isSplit ? styles.leftColumn : styles.fullWidth}>
         <WelcomeBanner username={userProfile?.username ?? 'Usuario'} />
@@ -288,63 +288,65 @@ export const HomeScreen: React.FC = () => {
         />
       </View>
 
-      {/* Columna Derecha (35% en Web) */}
-      <View style={isSplit ? styles.rightColumn : styles.fullWidth}>
-        {/* Mi Perfil */}
-        <Card padding="lg" style={styles.profileCard}>
-          <Text style={styles.profileHeaderTitle}>Mi Perfil</Text>
-          <View style={styles.avatarRow}>
-            <View style={[styles.avatarCircle, { overflow: 'hidden' }]}>
-              {userProfile?.photoUrl ? (
-                <Image source={{ uri: userProfile.photoUrl }} style={styles.avatarImg} />
-              ) : (
-                <Text style={styles.avatarInitial}>
-                  {userProfile?.username ? userProfile.username.charAt(0).toUpperCase() : 'U'}
+      {/* Columna Derecha (35% en Web) — ocultar en móvil */}
+      {isSplit && (
+        <View style={styles.rightColumn}>
+          {/* Mi Perfil */}
+          <Card padding="lg" style={styles.profileCard}>
+            <Text style={styles.profileHeaderTitle}>Mi Perfil</Text>
+            <View style={styles.avatarRow}>
+              <View style={[styles.avatarCircle, { overflow: 'hidden' }]}>
+                {userProfile?.photoUrl ? (
+                  <Image key={userProfile.photoUrl} source={{ uri: userProfile.photoUrl }} style={styles.avatarImg} />
+                ) : (
+                  <Text style={styles.avatarInitial}>
+                    {userProfile?.username ? userProfile.username.charAt(0).toUpperCase() : 'U'}
+                  </Text>
+                )}
+              </View>
+              <View style={styles.profileDetails}>
+                <Text style={styles.profileName} numberOfLines={1}>
+                  {userProfile?.primerNombre 
+                    ? `${userProfile.primerNombre} ${userProfile.primerApellido ?? ''}`.trim()
+                    : userProfile?.username ?? 'Usuario'}
+                </Text>
+                <View style={styles.rolBadge}>
+                  {accessProfile?.esSuperadministrador && (
+                    <Ionicons name="shield-checkmark" size={12} color={colors.primary} />
+                  )}
+                  <Text style={styles.profileRol}>{rolPrincipal}</Text>
+                </View>
+              </View>
+            </View>
+            <View style={styles.profileDivider} />
+            <View style={styles.profileInfoList}>
+              <Text style={styles.profileInfoText}>Email: {userProfile?.email ?? '—'}</Text>
+              {proyectos.length > 0 && (
+                <Text style={styles.profileInfoText}>
+                  Proyecto: {selectedProjectName}
                 </Text>
               )}
             </View>
-            <View style={styles.profileDetails}>
-              <Text style={styles.profileName} numberOfLines={1}>
-                {userProfile?.primerNombre 
-                  ? `${userProfile.primerNombre} ${userProfile.primerApellido ?? ''}`.trim()
-                  : userProfile?.username ?? 'Usuario'}
-              </Text>
-              <View style={styles.rolBadge}>
-                {accessProfile?.esSuperadministrador && (
-                  <Ionicons name="shield-checkmark" size={12} color={colors.primary} />
-                )}
-                <Text style={styles.profileRol}>{rolPrincipal}</Text>
-              </View>
+            <View style={styles.profileActionsRow}>
+              <Button
+                label="Editar Perfil"
+                variant="secondary"
+                onPress={() => setShowProfileModal(true)}
+                style={{ flex: 1 }}
+              />
+              <Button
+                label="Cerrar Sesión"
+                variant="ghost"
+                onPress={handleLogout}
+                style={{ flex: 1 }}
+              />
             </View>
-          </View>
-          <View style={styles.profileDivider} />
-          <View style={styles.profileInfoList}>
-            <Text style={styles.profileInfoText}>Email: {userProfile?.email ?? '—'}</Text>
-            {proyectos.length > 0 && (
-              <Text style={styles.profileInfoText}>
-                Proyecto: {selectedProjectName}
-              </Text>
-            )}
-          </View>
-          <View style={styles.profileActionsRow}>
-            <Button
-              label="Editar Perfil"
-              variant="secondary"
-              onPress={() => setShowProfileModal(true)}
-              style={{ flex: 1 }}
-            />
-            <Button
-              label="Cerrar Sesión"
-              variant="ghost"
-              onPress={handleLogout}
-              style={{ flex: 1 }}
-            />
-          </View>
-        </Card>
+          </Card>
 
-        {/* Calendario */}
-        <MiniCalendar />
-      </View>
+          {/* Calendario */}
+          <MiniCalendar />
+        </View>
+      )}
     </View>
   );
 
@@ -361,10 +363,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   dashboardGrid: {
-    flexDirection: Platform.select({
-      web: 'row' as any,
-      default: 'column' as any,
-    }),
     justifyContent: 'space-between',
     width: '100%',
     padding: spacing.md,
