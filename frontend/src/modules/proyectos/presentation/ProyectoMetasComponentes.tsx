@@ -32,10 +32,24 @@ export const ProyectoMetasComponentes: React.FC<Props> = ({ proyectoId, isAdmin 
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const isSuperAdmin = accessProfile?.esSuperadministrador === true;
 
-  const isGestor = isSuperAdmin || (accessProfile?.asignaciones?.some(
-    (a) => a.proyectoId === proyectoId && 
-    ['superadministrador', 'administrador_proyecto', 'coordinador_proyecto', 'coordinador_general'].includes(a.rolCodigo)
-  ) ?? false);
+  /** Helper: comprueba si el usuario tiene alguno de los roles dados en este proyecto */
+  const tieneRolEnProyecto = (roles: string[]) =>
+    accessProfile?.asignaciones?.some(
+      (a) => a.proyectoId === proyectoId && roles.includes(a.rolCodigo)
+    ) ?? false;
+
+  /** Puede crear metas: Superadmin, Coord. Proyecto, Coord. General, Admin Proyecto */
+  const puedeCrearMeta = isSuperAdmin || tieneRolEnProyecto([
+    'administrador_proyecto', 'coordinador_proyecto', 'coordinador_general',
+  ]);
+
+  /** Puede editar metas: lo anterior + Coord. Componente */
+  const puedeEditarMeta = isSuperAdmin || tieneRolEnProyecto([
+    'administrador_proyecto', 'coordinador_proyecto', 'coordinador_general', 'coordinador_componente',
+  ]);
+
+  /** Puede eliminar metas: solo Superadmin */
+  const puedeEliminarMeta = isSuperAdmin;
 
   // Paginación
   const [pagina, setPagina] = useState(1);
@@ -96,7 +110,7 @@ export const ProyectoMetasComponentes: React.FC<Props> = ({ proyectoId, isAdmin 
               mapa proyecto
             </Text>
           </TouchableOpacity>
-          {(isGestor || isAdmin) && (
+          {(puedeCrearMeta || isAdmin) && (
             <Button label="+ Nueva Meta" size="sm" onPress={() => setModalMeta(true)} />
           )}
         </View>
@@ -132,7 +146,7 @@ export const ProyectoMetasComponentes: React.FC<Props> = ({ proyectoId, isAdmin 
                 {meta.cantidadAcciones ?? '—'}
               </Text>
               <View style={[styles.celda, styles.celdaAccion]}>
-                {(isGestor || isAdmin) && (
+                {(puedeEditarMeta || isAdmin) && (
                   <TouchableOpacity
                     accessibilityLabel={`Editar meta ${meta.nombre}`}
                     onPress={() => setMetaAEditar(meta)}
@@ -141,7 +155,7 @@ export const ProyectoMetasComponentes: React.FC<Props> = ({ proyectoId, isAdmin 
                     <Ionicons name="pencil-outline" size={16} color={colors.primary} />
                   </TouchableOpacity>
                 )}
-                {isSuperAdmin && (
+                {puedeEliminarMeta && (
                   <TouchableOpacity
                     accessibilityLabel={`Eliminar meta ${meta.nombre}`}
                     disabled={eliminandoMetaId === meta.id}

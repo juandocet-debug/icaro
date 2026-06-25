@@ -18,7 +18,7 @@ interface Props {
 }
 
 export const ProfileEditModal: React.FC<Props> = ({ visible, onClose }) => {
-  const { userProfile, actualizarFotoPerfil, actualizarPerfil } = useAuth();
+  const { userProfile, actualizarFotoPerfil, actualizarPerfil, logout } = useAuth();
   const fileInputRef = useRef<any>(null);
 
   const [primerNombre, setPrimerNombre] = useState('');
@@ -244,8 +244,18 @@ export const ProfileEditModal: React.FC<Props> = ({ visible, onClose }) => {
 
           {/* Footer Actions */}
           <View style={styles.actions}>
-            <Button label="Cancelar" variant="ghost" onPress={onClose} disabled={saving} />
-            <Button label="Guardar Cambios" onPress={handleGuardar} loading={saving} disabled={saving} />
+            <TouchableOpacity
+              onPress={() => { onClose(); logout(); }}
+              style={styles.logoutBtn}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="log-out-outline" size={16} color={colors.error} />
+              <Text style={styles.logoutTxt}>Cerrar Sesión</Text>
+            </TouchableOpacity>
+            <View style={styles.actionsRight}>
+              <Button label="Cancelar" variant="ghost" onPress={onClose} disabled={saving} />
+              <Button label="Guardar Cambios" onPress={handleGuardar} loading={saving} disabled={saving} />
+            </View>
           </View>
         </View>
       </View>
@@ -391,11 +401,28 @@ const styles = StyleSheet.create({
   },
   actions: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: spacing.sm,
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginTop: spacing.md,
     borderTopWidth: 1,
     borderTopColor: colors.border,
     paddingTop: spacing.md,
   } as any,
+  actionsRight: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  } as any,
+  logoutBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+  } as any,
+  logoutTxt: {
+    fontFamily: typography.fontFamily,
+    fontSize: typography.sizes.sm,
+    color: colors.error,
+    fontWeight: typography.weights.medium,
+  },
 });
