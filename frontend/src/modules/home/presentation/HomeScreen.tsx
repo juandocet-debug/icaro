@@ -51,7 +51,16 @@ export const HomeScreen: React.FC = () => {
 
   // Usuario sin proyectos y no superadmin
   if (!accessLoading && accessProfile && !accessProfile.esSuperadministrador && accessProfile.asignaciones.length === 0) {
-    return <NoAssignmentsScreen />;
+    return (
+      <AppShell scrollable={true} style={styles.shell}>
+        <NoAssignmentsScreen
+          onLogout={handleLogout}
+          onEditProfile={() => setShowProfileModal(true)}
+          userProfile={userProfile}
+        />
+        <ProfileEditModal visible={showProfileModal} onClose={() => setShowProfileModal(false)} />
+      </AppShell>
+    );
   }
 
   // Rol principal a mostrar en el perfil

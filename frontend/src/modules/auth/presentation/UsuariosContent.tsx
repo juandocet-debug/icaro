@@ -194,7 +194,7 @@ export const UsuariosContent: React.FC<UsuariosContentProps> = ({ showForm, setS
             <View style={{ gap: spacing.sm, marginBottom: spacing.md }}>
               <View style={{ backgroundColor: colors.background, borderRadius: 8, padding: spacing.sm }}>
                 <Text style={{ color: colors.textSecondary, fontSize: 11, marginBottom: 2 }}>USUARIO (CÉDULA)</Text>
-                <Text style={{ color: colors.text, fontSize: 15, fontWeight: '600', letterSpacing: 1 }}>
+                <Text style={{ color: colors.textPrimary, fontSize: 15, fontWeight: '600', letterSpacing: 1 }}>
                   {credenciales?.username}
                 </Text>
               </View>
@@ -230,7 +230,7 @@ export const UsuariosContent: React.FC<UsuariosContentProps> = ({ showForm, setS
                 style={{ paddingHorizontal: spacing.md, paddingVertical: spacing.sm + 2, borderRadius: 8, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' }}
                 onPress={() => { setCredenciales(null); setCopiado(false); }}
               >
-                <Text style={{ color: colors.text, fontWeight: '600', fontSize: 13 }}>Listo</Text>
+                <Text style={{ color: colors.textPrimary, fontWeight: '600', fontSize: 13 }}>Listo</Text>
               </TouchableOpacity>
             </View>
           </Card>
