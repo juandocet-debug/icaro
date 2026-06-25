@@ -11,6 +11,7 @@ type ApiAsignacion = {
   proyecto_nombre: string | null;
   componente_id: string | null;
   accion_id: string | null;
+  permisos?: string[];
 };
 type ApiAcceso = {
   ok: boolean;
@@ -56,6 +57,7 @@ export class AxiosAccessRepository implements AccessRepositoryPort {
             proyectoNombre: a.proyecto_nombre,
             componenteId: a.componente_id,
             accionId: a.accion_id,
+            permisos: a.permisos || [],
           }))
         : [],
     };

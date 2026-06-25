@@ -79,9 +79,6 @@ export const AccessProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     );
   };
 
-  /**
-   * Permiso en el contexto de un proyecto concreto.
-   */
   const canInProject = (permission: string, projectId: string): boolean => {
     if (!accessProfile) return false;
     if (accessProfile.esSuperadministrador) return true;
@@ -89,8 +86,7 @@ export const AccessProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       return true;
     }
     return accessProfile.asignaciones.some(
-      (a) => a.proyectoId === projectId &&
-        accessProfile.permisos.some((p) => p.codigo === permission && p.alcance === 'proyecto')
+      (a) => a.proyectoId === projectId && a.permisos?.includes(permission)
     );
   };
 

@@ -18,6 +18,7 @@ export interface AsignacionPerfil {
   proyectoNombre: string | null;
   componenteId: string | null;
   accionId: string | null;
+  permisos?: string[];
 }
 
 export interface AccessProfile {

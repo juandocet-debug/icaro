@@ -54,6 +54,8 @@ class ObtenerMiAccesoUseCase:
                 if tipo_alcance == 'publico':
                     continue
 
+                codigos = RolPermisoModel.objects.filter(rol=ur.rol).values_list('permiso_id', flat=True)
+
                 asignaciones.append({
                     'rol_codigo': ur.rol.codigo,
                     'rol_nombre': ur.rol.nombre,
@@ -62,9 +64,9 @@ class ObtenerMiAccesoUseCase:
                     'proyecto_nombre': ur.proyecto.name if ur.proyecto else None,
                     'componente_id': str(ur.componente.id) if ur.componente else None,
                     'accion_id': str(ur.accion.id) if ur.accion else None,
+                    'permisos': list(codigos),
                 })
 
-                codigos = RolPermisoModel.objects.filter(rol=ur.rol).values_list('permiso_id', flat=True)
                 for codigo in codigos:
                     prioridad_nueva = PRIORIDAD.get(tipo_alcance, 99)
                     prioridad_actual = PRIORIDAD.get(permisos_mapa.get(codigo, 'accion'), 99)
