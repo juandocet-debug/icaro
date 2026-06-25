@@ -21,6 +21,7 @@ interface Props {
   onEvidencia?: () => void;
   onEdit?: () => void;
   onDelete?: () => void;
+  disabled?: boolean;
   // Solo para acciones
   ejecucion?: number;
   proyeccion?: number | null;
@@ -49,7 +50,7 @@ const ESTADO_LABEL: Record<string, string> = {
 export const MetaMapNode: React.FC<Props> = ({
   kind, title, subtitle, badge, counter, expanded, onToggle, onAdd, addLabel,
   onEvidencia, onEdit, onDelete, ejecucion, proyeccion, unidad, avancePorcentaje, numRequisitos,
-  resumenVerificacion, responsables, onManageResponsibles,
+  resumenVerificacion, responsables, onManageResponsibles, disabled,
 }) => {
   const pct = avancePorcentaje != null
     ? Math.min(Math.round(avancePorcentaje), 100)
@@ -75,23 +76,36 @@ export const MetaMapNode: React.FC<Props> = ({
   const pillLabel = onAdd ? (addLabel ?? '+ Agregar') : 'Evidencia';
 
   return (
-    <View style={[styles.card, { borderTopColor: borderColor }]}>
+    <View style={[styles.card, { borderTopColor: borderColor }, disabled && { opacity: 0.65 }]}>
       {/* Header Row */}
       <View style={styles.header}>
         <View style={[styles.badge, { backgroundColor: borderColor + '12', borderColor: borderColor + '30' }]}>
           <Ionicons name={kindIcon as any} size={11} color={borderColor} style={{ marginRight: 4 }} />
           <Text style={[styles.badgeTxt, { color: borderColor }]}>{badge || kindLabel}</Text>
+          {disabled && (
+            <Ionicons name="lock-closed" size={10} color={colors.textSecondary} style={{ marginLeft: 4 }} />
+          )}
         </View>
 
         <View style={styles.headerActions}>
           {onEdit && (
-            <TouchableOpacity style={styles.actionIconBtn} onPress={onEdit} accessibilityLabel="Editar">
-              <Ionicons name="pencil-outline" size={14} color={colors.textSecondary} />
+            <TouchableOpacity
+              style={styles.actionIconBtn}
+              onPress={onEdit}
+              disabled={disabled}
+              accessibilityLabel="Editar"
+            >
+              <Ionicons name="pencil-outline" size={14} color={disabled ? '#94a3b8' : colors.textSecondary} />
             </TouchableOpacity>
           )}
           {onDelete && (
-            <TouchableOpacity style={styles.actionIconBtn} onPress={onDelete} accessibilityLabel="Eliminar">
-              <Ionicons name="trash-outline" size={14} color={colors.error + 'D0'} />
+            <TouchableOpacity
+              style={styles.actionIconBtn}
+              onPress={onDelete}
+              disabled={disabled}
+              accessibilityLabel="Eliminar"
+            >
+              <Ionicons name="trash-outline" size={14} color={disabled ? '#94a3b8' : colors.error + 'D0'} />
             </TouchableOpacity>
           )}
           {onToggle && (
@@ -174,8 +188,13 @@ export const MetaMapNode: React.FC<Props> = ({
                     )}
                   </View>
                   {onManageResponsibles && (
-                    <TouchableOpacity style={styles.manageRespBtn} onPress={onManageResponsibles} accessibilityLabel="Gestionar responsables">
-                      <Ionicons name="people-outline" size={13} color={colors.primary} />
+                    <TouchableOpacity
+                      style={styles.manageRespBtn}
+                      onPress={onManageResponsibles}
+                      disabled={disabled}
+                      accessibilityLabel="Gestionar responsables"
+                    >
+                      <Ionicons name="people-outline" size={13} color={disabled ? '#94a3b8' : colors.primary} />
                     </TouchableOpacity>
                   )}
                 </View>
@@ -185,8 +204,15 @@ export const MetaMapNode: React.FC<Props> = ({
         </View>
 
         {hasPillButton && pillAction && (
-          <TouchableOpacity style={styles.pillButton} onPress={pillAction}>
-            <Text style={styles.pillButtonText}>{pillLabel}</Text>
+          <TouchableOpacity
+            style={[
+              styles.pillButton,
+              disabled && { backgroundColor: '#e2e8f0', borderColor: '#cbd5e1' }
+            ]}
+            onPress={disabled ? undefined : pillAction}
+            disabled={disabled}
+          >
+            <Text style={[styles.pillButtonText, disabled && { color: '#94a3b8' }]}>{pillLabel}</Text>
           </TouchableOpacity>
         )}
       </View>

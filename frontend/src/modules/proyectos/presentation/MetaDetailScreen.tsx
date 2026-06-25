@@ -168,12 +168,13 @@ interface DraggableCompProps {
   onEditComp?: () => void;
   onDeleteComp?: () => void;
   canCrearAccion: boolean;
+  disabled?: boolean;
 }
 
 const DraggableComp: React.FC<DraggableCompProps> = ({
   comp, pos, positions, setPositions, setNodeSize,
   isOpen, accCount, onToggle, onAdd,
-  onEditComp, onDeleteComp, canCrearAccion,
+  onEditComp, onDeleteComp, canCrearAccion, disabled,
 }) => {
   const { onMouseDown } = useDraggableNode(comp.id, positions, setPositions);
 
@@ -205,6 +206,7 @@ const DraggableComp: React.FC<DraggableCompProps> = ({
           addLabel="+ Acción"
           onEdit={onEditComp}
           onDelete={onDeleteComp}
+          disabled={disabled}
         />
       </div>
     </div>
@@ -221,11 +223,12 @@ interface DraggableAccProps {
   onGestionarResp?: () => void;
   onEditAcc?: () => void;
   onDeleteAcc?: () => void;
+  disabled?: boolean;
 }
 
 const DraggableAcc: React.FC<DraggableAccProps> = ({
   acc, pos, positions, setPositions, setNodeSize,
-  onEvidencia, onGestionarResp, onEditAcc, onDeleteAcc,
+  onEvidencia, onGestionarResp, onEditAcc, onDeleteAcc, disabled,
 }) => {
   const { onMouseDown } = useDraggableNode(acc.id, positions, setPositions);
 
@@ -261,6 +264,7 @@ const DraggableAcc: React.FC<DraggableAccProps> = ({
           onEvidencia={onEvidencia}
           onEdit={onEditAcc}
           onDelete={onDeleteAcc}
+          disabled={disabled}
         />
       </div>
     </div>
@@ -575,9 +579,7 @@ export const MetaDetailScreen: React.FC<Props> = ({ proyectoId, metaId }) => {
         const isOpen = !!expanded[comp.id];
         const accs   = acciones[comp.id] ?? [];
         
-        const puedeEditarEsteComp = canEditarComponente && (!esCoordinadorComponenteRestringido || componentesAsignadosIds.includes(comp.id));
-        const puedeEliminarEsteComp = canEliminarComponente && (!esCoordinadorComponenteRestringido || componentesAsignadosIds.includes(comp.id));
-        const puedeCrearAccionEnEsteComp = canCrearAccion && (!esCoordinadorComponenteRestringido || componentesAsignadosIds.includes(comp.id));
+        const isCompDisabled = esCoordinadorComponenteRestringido && !componentesAsignadosIds.includes(comp.id);
 
         return (
           <DraggableComp
@@ -590,10 +592,11 @@ export const MetaDetailScreen: React.FC<Props> = ({ proyectoId, metaId }) => {
             isOpen={isOpen}
             accCount={accs.length}
             onToggle={() => toggleComp(comp.id)}
-            onAdd={puedeCrearAccionEnEsteComp ? () => router.push(`/proyectos/${proyectoId}/acciones/crear?componenteId=${comp.id}` as any) : undefined}
-            onEditComp={puedeEditarEsteComp ? () => setEditComp(comp) : undefined}
-            onDeleteComp={puedeEliminarEsteComp ? () => setDeleteData({ kind: 'componente', id: comp.id }) : undefined}
-            canCrearAccion={puedeCrearAccionEnEsteComp}
+            onAdd={canCrearAccion ? () => router.push(`/proyectos/${proyectoId}/acciones/crear?componenteId=${comp.id}` as any) : undefined}
+            onEditComp={canEditarComponente ? () => setEditComp(comp) : undefined}
+            onDeleteComp={canEliminarComponente ? () => setDeleteData({ kind: 'componente', id: comp.id }) : undefined}
+            canCrearAccion={canCrearAccion}
+            disabled={isCompDisabled}
           />
         );
       })}
@@ -603,10 +606,7 @@ export const MetaDetailScreen: React.FC<Props> = ({ proyectoId, metaId }) => {
         if (!expanded[comp.id]) return [];
         const accs = acciones[comp.id] ?? [];
         
-        const puedeEditarEstaAcc = canEditarAccion && (!esCoordinadorComponenteRestringido || componentesAsignadosIds.includes(comp.id));
-        const puedeEliminarEstaAcc = canEliminarAccion && (!esCoordinadorComponenteRestringido || componentesAsignadosIds.includes(comp.id));
-        const puedeSubirEvidenciaEstaAcc = canSubirEvidencia && (!esCoordinadorComponenteRestringido || componentesAsignadosIds.includes(comp.id));
-        const puedeGestionarRespEstaAcc = canGestionarResponsables && (!esCoordinadorComponenteRestringido || componentesAsignadosIds.includes(comp.id));
+        const isCompDisabled = esCoordinadorComponenteRestringido && !componentesAsignadosIds.includes(comp.id);
 
         return accs.map((acc, i) => {
           const pos = positions[acc.id] ?? { x: COMP_INIT_X + NODE_W + 120, y: COMP_INIT_Y + i * 160 };
@@ -618,10 +618,11 @@ export const MetaDetailScreen: React.FC<Props> = ({ proyectoId, metaId }) => {
               positions={positions}
               setPositions={setPositions}
               setNodeSize={setNodeSize}
-              onEvidencia={puedeSubirEvidenciaEstaAcc ? () => setModalEvid({ ...acc, componenteId: comp.id }) : undefined}
-              onGestionarResp={puedeGestionarRespEstaAcc ? () => setModalResp({ ...acc, componenteId: comp.id }) : undefined}
-              onEditAcc={puedeEditarEstaAcc ? () => router.push(`/proyectos/${proyectoId}/acciones/${acc.id}/editar?componenteId=${comp.id}` as any) : undefined}
-              onDeleteAcc={puedeEliminarEstaAcc ? () => setDeleteData({ kind: 'accion', id: acc.id, extraId: comp.id }) : undefined}
+              onEvidencia={canSubirEvidencia ? () => setModalEvid({ ...acc, componenteId: comp.id }) : undefined}
+              onGestionarResp={canGestionarResponsables ? () => setModalResp({ ...acc, componenteId: comp.id }) : undefined}
+              onEditAcc={canEditarAccion ? () => router.push(`/proyectos/${proyectoId}/acciones/${acc.id}/editar?componenteId=${comp.id}` as any) : undefined}
+              onDeleteAcc={canEliminarAccion ? () => setDeleteData({ kind: 'accion', id: acc.id, extraId: comp.id }) : undefined}
+              disabled={isCompDisabled}
             />
           );
         });
@@ -660,9 +661,7 @@ export const MetaDetailScreen: React.FC<Props> = ({ proyectoId, metaId }) => {
             const isOpen = !!expanded[comp.id];
             const accs   = acciones[comp.id] ?? [];
             
-            const puedeEditarEsteComp = canEditarComponente && (!esCoordinadorComponenteRestringido || componentesAsignadosIds.includes(comp.id));
-            const puedeEliminarEsteComp = canEliminarComponente && (!esCoordinadorComponenteRestringido || componentesAsignadosIds.includes(comp.id));
-            const puedeCrearAccionEnEsteComp = canCrearAccion && (!esCoordinadorComponenteRestringido || componentesAsignadosIds.includes(comp.id));
+            const isCompDisabled = esCoordinadorComponenteRestringido && !componentesAsignadosIds.includes(comp.id);
 
             return (
               <View key={comp.id} style={styles.mobileComp}>
@@ -674,9 +673,10 @@ export const MetaDetailScreen: React.FC<Props> = ({ proyectoId, metaId }) => {
                   counter={accs.length}
                   expanded={isOpen}
                   onToggle={() => toggleComp(comp.id)}
-                  onAdd={puedeCrearAccionEnEsteComp ? () => router.push(`/proyectos/${proyectoId}/acciones/crear?componenteId=${comp.id}` as any) : undefined}
-                  onEdit={puedeEditarEsteComp ? () => setEditComp(comp) : undefined}
-                  onDelete={puedeEliminarEsteComp ? () => setDeleteData({ kind: 'componente', id: comp.id }) : undefined}
+                  onAdd={canCrearAccion ? () => router.push(`/proyectos/${proyectoId}/acciones/crear?componenteId=${comp.id}` as any) : undefined}
+                  onEdit={canEditarComponente ? () => setEditComp(comp) : undefined}
+                  onDelete={canEliminarComponente ? () => setDeleteData({ kind: 'componente', id: comp.id }) : undefined}
+                  disabled={isCompDisabled}
                 />
               </View>
             );

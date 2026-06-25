@@ -313,38 +313,23 @@ export const ProyectoDetailScreen: React.FC<Props> = ({ proyectoId }) => {
       />
 
       {/* Contenedor de Estructura / Metas / Actividades */}
-      {canVerMetas ? (
-        isMobile ? (
-          <View style={{ gap: spacing.lg }}>
-            <ProyectoMetasComponentes proyectoId={proyectoId} isAdmin={canEdit} />
-            {canVerEquipo && <ProyectoEquipo proyectoId={proyectoId} isAdmin={canEdit} />}
-            {/* <ProyectoTiposDocumento proyectoId={proyectoId} isAdmin={canEdit} /> -- proximamente */}
-          </View>
-        ) : (
-          <View style={{ flexDirection: 'row', gap: spacing.lg, alignItems: 'flex-start', width: '100%' }}>
-            <View style={{ flex: 1.6, gap: spacing.lg }}>
-              {canVerEquipo && <ProyectoEquipo proyectoId={proyectoId} isAdmin={canEdit} />}
-              {/* <ProyectoTiposDocumento proyectoId={proyectoId} isAdmin={canEdit} /> -- proximamente */}
-            </View>
-            <View style={{ flex: 1, minWidth: 240, gap: spacing.lg }}>
-              <ProyectoMetasComponentes proyectoId={proyectoId} isAdmin={canEdit} />
-            </View>
-          </View>
-        )
-      ) : (
-        isMobile ? (
-          <View style={{ gap: spacing.lg }}>
-            {canVerEquipo && <ProyectoEquipo proyectoId={proyectoId} isAdmin={canEdit} />}
+      {isMobile ? (
+        <View style={{ gap: spacing.lg }}>
+          {!isGestor && (
             <CollaboratorActivities
               misActividades={misActividades}
               loadingActs={loadingActs}
               groupedActs={groupedActs}
               isMobileView={true}
             />
-          </View>
-        ) : (
-          <View style={{ flexDirection: 'row', gap: spacing.lg, alignItems: 'flex-start', width: '100%' }}>
-            <View style={{ flex: 1.6, gap: spacing.lg }}>
+          )}
+          <ProyectoMetasComponentes proyectoId={proyectoId} isAdmin={canEdit} />
+          {canVerEquipo && <ProyectoEquipo proyectoId={proyectoId} isAdmin={canEdit} />}
+        </View>
+      ) : (
+        <View style={{ flexDirection: 'row', gap: spacing.lg, alignItems: 'flex-start', width: '100%' }}>
+          <View style={{ flex: 1.6, gap: spacing.lg }}>
+            {!isGestor ? (
               <ProyectoActividadesTabla
                 misActividades={misActividades}
                 actsSearch={actsSearch}
@@ -352,12 +337,15 @@ export const ProyectoDetailScreen: React.FC<Props> = ({ proyectoId }) => {
                 filteredActs={filteredActs}
                 isMobile={false}
               />
-            </View>
-            <View style={{ flex: 1, minWidth: 240 }}>
-              {canVerEquipo && <ProyectoEquipo proyectoId={proyectoId} isAdmin={canEdit} />}
-            </View>
+            ) : (
+              canVerEquipo && <ProyectoEquipo proyectoId={proyectoId} isAdmin={canEdit} />
+            )}
           </View>
-        )
+          <View style={{ flex: 1, minWidth: 240, gap: spacing.lg }}>
+            <ProyectoMetasComponentes proyectoId={proyectoId} isAdmin={canEdit} />
+            {!isGestor && canVerEquipo && <ProyectoEquipo proyectoId={proyectoId} isAdmin={canEdit} />}
+          </View>
+        </View>
       )}
 
       {showConfirmModal && (
