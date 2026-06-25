@@ -102,7 +102,7 @@ def _serialize_upload(u):
         'created_at': u.created_at.strftime('%d %b %Y') if u.created_at else None,
     }
 
-def _build_user_context(usuario, accion_ids: list, proyecto_ids: list) -> dict:
+def _build_user_context(usuario, accion_ids: list, proyecto_ids: list, componente_ids: list | None = None) -> dict:
     """
     Pre-calcula en bulk (3 queries) lo que antes era N queries dentro del loop:
     - asignaciones del usuario por accion_id
@@ -126,22 +126,17 @@ def _build_user_context(usuario, accion_ids: list, proyecto_ids: list) -> dict:
         pid = str(row['proyecto_id'])
         roles_por_proyecto.setdefault(pid, []).append(row['rol__nombre'])
 
-    # IDs de componentes de las acciones, para el chequeo de coordinador_componente
-    componente_ids = list(
-        AccionModel.objects.filter(id__in=accion_ids)
-        .values_list('component_id', flat=True)
-        .distinct()
-    )
-
+    # Chequeo de coordinador_componente usando componente_ids pasados como parámetro (sin query extra)
+    comp_ids = componente_ids or []
     es_gestor = usuario.is_superuser or UsuarioRolModel.objects.filter(
         usuario=usuario, proyecto_id__in=proyecto_ids,
         rol__codigo__in=_ROLES_GESTOR, activo=True
-    ).exists() or UsuarioRolModel.objects.filter(
+    ).exists() or (bool(comp_ids) and UsuarioRolModel.objects.filter(
         usuario=usuario,
-        componente_id__in=componente_ids,
+        componente_id__in=comp_ids,
         rol__codigo='coordinador_componente',
         activo=True
-    ).exists()
+    ).exists())
 
     return {
         'asignaciones': asignaciones,
@@ -319,7 +314,8 @@ class MisActividadesController(APIView):
             # Pre-calcular en bulk para evitar N+1 dentro del loop de serialización
             action_ids   = [a.id for a in items]
             proyecto_ids = list({str(a.component.project_id) for a in items})
-            ctx = _build_user_context(request.user, action_ids, proyecto_ids) if items else {}
+            comp_ids     = list({str(a.component_id) for a in items})
+            ctx = _build_user_context(request.user, action_ids, proyecto_ids, componente_ids=comp_ids) if items else {}
 
             return Response({
                 'ok': True,
