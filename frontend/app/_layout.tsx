@@ -62,10 +62,7 @@ const InitialLayout = () => {
       // Superadministrador permanece en /. Usuarios operativos con asignaciones van
       // a /proyectos (su punto de entrada operativo). Usuarios SIN asignaciones
       // permanecen en / para ver NoAssignmentsScreen con acceso a perfil y logout.
-      if (rootSegment === '' && !accessProfile.esSuperadministrador && accessProfile.asignaciones.length > 0) {
-        router.replace('/proyectos');
-        return;
-      }
+
 
       // ── 5. Guard dinámico por ruta ─────────────────────────────────────────
       const rule = ROUTE_RULES[rootSegment];

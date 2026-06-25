@@ -78,7 +78,11 @@ export const ProyectoDetailScreen: React.FC<Props> = ({ proyectoId }) => {
   const useCase = obtenerProyectoUseCase;
 
   const isSuperAdmin = accessProfile?.esSuperadministrador === true;
-  const canVerMetas = isSuperAdmin || canInProject('metas.ver', proyectoId);
+  const canVerMetas = isSuperAdmin || 
+    canInProject('metas.ver', proyectoId) || 
+    (accessProfile?.asignaciones?.some(
+      (a) => a.proyectoId === proyectoId && a.rolCodigo === 'coordinador_componente'
+    ) ?? false);
   const isGestor = isSuperAdmin || (accessProfile?.asignaciones?.some(
     (a) => a.proyectoId === proyectoId && 
     ['superadministrador', 'administrador_proyecto', 'coordinador_proyecto', 'coordinador_general'].includes(a.rolCodigo)

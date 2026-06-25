@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, Platform, ScrollView } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,6 +20,7 @@ import {
   eliminarAccionUseCase,
 } from '../../../shared/dependencies';
 import { useProjectPermission } from '../../auth/presentation/useProjectPermission';
+import { useAccess } from '../../auth/presentation/useAccess';
 import { MetaMapCanvas } from './MetaMapCanvas';
 import { MetaMapNode } from './MetaMapNode';
 import { CrearComponenteModal } from './CrearComponenteModal';
@@ -270,6 +271,9 @@ const DraggableAcc: React.FC<DraggableAccProps> = ({
 interface Props { proyectoId: string; metaId: string; }
 
 export const MetaDetailScreen: React.FC<Props> = ({ proyectoId, metaId }) => {
+  const { accessProfile } = useAccess();
+  const isSuperAdmin = accessProfile?.esSuperadministrador === true;
+
   const { canDo } = useProjectPermission(proyectoId);
   const canCrearComponente = canDo('componentes.crear');
   const canEditarComponente= canDo('componentes.editar');
@@ -281,6 +285,26 @@ export const MetaDetailScreen: React.FC<Props> = ({ proyectoId, metaId }) => {
   const canEliminarMeta    = canDo('metas.eliminar');
   const canSubirEvidencia       = canDo('evidencias.subir');
   const canGestionarResponsables = canDo('acciones.asignar_responsables');
+
+  // Lógica de Coordinador de Componente
+  const isComponentCoordinator = accessProfile?.asignaciones?.some(
+    (a) => a.proyectoId === proyectoId && a.rolCodigo === 'coordinador_componente'
+  ) ?? false;
+
+  const tieneRolSuperior = isSuperAdmin || (accessProfile?.asignaciones?.some(
+    (a) => a.proyectoId === proyectoId && 
+    ['superadministrador', 'administrador_proyecto', 'coordinador_proyecto', 'coordinador_general'].includes(a.rolCodigo)
+  ) ?? false);
+
+  const esCoordinadorComponenteRestringido = isComponentCoordinator && !tieneRolSuperior;
+
+  const componentesAsignadosIds = useMemo(() => {
+    if (!accessProfile) return [];
+    return accessProfile.asignaciones
+      .filter((a) => a.proyectoId === proyectoId && a.rolCodigo === 'coordinador_componente')
+      .map((a) => a.componenteId)
+      .filter(Boolean) as string[];
+  }, [accessProfile, proyectoId]);
 
   const [meta,       setMeta]       = useState<Meta | null>(null);
   const [componentes,setComponentes]= useState<Componente[]>([]);
@@ -550,6 +574,11 @@ export const MetaDetailScreen: React.FC<Props> = ({ proyectoId, metaId }) => {
         const pos  = positions[comp.id] ?? { x: COMP_INIT_X, y: 0 };
         const isOpen = !!expanded[comp.id];
         const accs   = acciones[comp.id] ?? [];
+        
+        const puedeEditarEsteComp = canEditarComponente && (!esCoordinadorComponenteRestringido || componentesAsignadosIds.includes(comp.id));
+        const puedeEliminarEsteComp = canEliminarComponente && (!esCoordinadorComponenteRestringido || componentesAsignadosIds.includes(comp.id));
+        const puedeCrearAccionEnEsteComp = canCrearAccion && (!esCoordinadorComponenteRestringido || componentesAsignadosIds.includes(comp.id));
+
         return (
           <DraggableComp
             key={comp.id}
@@ -561,10 +590,10 @@ export const MetaDetailScreen: React.FC<Props> = ({ proyectoId, metaId }) => {
             isOpen={isOpen}
             accCount={accs.length}
             onToggle={() => toggleComp(comp.id)}
-            onAdd={() => router.push(`/proyectos/${proyectoId}/acciones/crear?componenteId=${comp.id}` as any)}
-            onEditComp={canEditarComponente ? () => setEditComp(comp) : undefined}
-            onDeleteComp={canEliminarComponente ? () => setDeleteData({ kind: 'componente', id: comp.id }) : undefined}
-            canCrearAccion={canCrearAccion}
+            onAdd={puedeCrearAccionEnEsteComp ? () => router.push(`/proyectos/${proyectoId}/acciones/crear?componenteId=${comp.id}` as any) : undefined}
+            onEditComp={puedeEditarEsteComp ? () => setEditComp(comp) : undefined}
+            onDeleteComp={puedeEliminarEsteComp ? () => setDeleteData({ kind: 'componente', id: comp.id }) : undefined}
+            canCrearAccion={puedeCrearAccionEnEsteComp}
           />
         );
       })}
@@ -573,6 +602,12 @@ export const MetaDetailScreen: React.FC<Props> = ({ proyectoId, metaId }) => {
       {metaOpen && componentes.flatMap(comp => {
         if (!expanded[comp.id]) return [];
         const accs = acciones[comp.id] ?? [];
+        
+        const puedeEditarEstaAcc = canEditarAccion && (!esCoordinadorComponenteRestringido || componentesAsignadosIds.includes(comp.id));
+        const puedeEliminarEstaAcc = canEliminarAccion && (!esCoordinadorComponenteRestringido || componentesAsignadosIds.includes(comp.id));
+        const puedeSubirEvidenciaEstaAcc = canSubirEvidencia && (!esCoordinadorComponenteRestringido || componentesAsignadosIds.includes(comp.id));
+        const puedeGestionarRespEstaAcc = canGestionarResponsables && (!esCoordinadorComponenteRestringido || componentesAsignadosIds.includes(comp.id));
+
         return accs.map((acc, i) => {
           const pos = positions[acc.id] ?? { x: COMP_INIT_X + NODE_W + 120, y: COMP_INIT_Y + i * 160 };
           return (
@@ -583,10 +618,10 @@ export const MetaDetailScreen: React.FC<Props> = ({ proyectoId, metaId }) => {
               positions={positions}
               setPositions={setPositions}
               setNodeSize={setNodeSize}
-              onEvidencia={canSubirEvidencia ? () => setModalEvid({ ...acc, componenteId: comp.id }) : undefined}
-              onGestionarResp={canGestionarResponsables ? () => setModalResp({ ...acc, componenteId: comp.id }) : undefined}
-              onEditAcc={canEditarAccion ? () => router.push(`/proyectos/${proyectoId}/acciones/${acc.id}/editar?componenteId=${comp.id}` as any) : undefined}
-              onDeleteAcc={canEliminarAccion ? () => setDeleteData({ kind: 'accion', id: acc.id, extraId: comp.id }) : undefined}
+              onEvidencia={puedeSubirEvidenciaEstaAcc ? () => setModalEvid({ ...acc, componenteId: comp.id }) : undefined}
+              onGestionarResp={puedeGestionarRespEstaAcc ? () => setModalResp({ ...acc, componenteId: comp.id }) : undefined}
+              onEditAcc={puedeEditarEstaAcc ? () => router.push(`/proyectos/${proyectoId}/acciones/${acc.id}/editar?componenteId=${comp.id}` as any) : undefined}
+              onDeleteAcc={puedeEliminarEstaAcc ? () => setDeleteData({ kind: 'accion', id: acc.id, extraId: comp.id }) : undefined}
             />
           );
         });
@@ -624,6 +659,11 @@ export const MetaDetailScreen: React.FC<Props> = ({ proyectoId, metaId }) => {
           {metaOpen && componentes.map((comp) => {
             const isOpen = !!expanded[comp.id];
             const accs   = acciones[comp.id] ?? [];
+            
+            const puedeEditarEsteComp = canEditarComponente && (!esCoordinadorComponenteRestringido || componentesAsignadosIds.includes(comp.id));
+            const puedeEliminarEsteComp = canEliminarComponente && (!esCoordinadorComponenteRestringido || componentesAsignadosIds.includes(comp.id));
+            const puedeCrearAccionEnEsteComp = canCrearAccion && (!esCoordinadorComponenteRestringido || componentesAsignadosIds.includes(comp.id));
+
             return (
               <View key={comp.id} style={styles.mobileComp}>
                 <View style={styles.mobileBranch} />
@@ -634,9 +674,9 @@ export const MetaDetailScreen: React.FC<Props> = ({ proyectoId, metaId }) => {
                   counter={accs.length}
                   expanded={isOpen}
                   onToggle={() => toggleComp(comp.id)}
-                  onAdd={canCrearAccion ? () => router.push(`/proyectos/${proyectoId}/acciones/crear?componenteId=${comp.id}` as any) : undefined}
-                  onEdit={canEditarComponente ? () => setEditComp(comp) : undefined}
-                  onDelete={canEliminarComponente ? () => setDeleteData({ kind: 'componente', id: comp.id }) : undefined}
+                  onAdd={puedeCrearAccionEnEsteComp ? () => router.push(`/proyectos/${proyectoId}/acciones/crear?componenteId=${comp.id}` as any) : undefined}
+                  onEdit={puedeEditarEsteComp ? () => setEditComp(comp) : undefined}
+                  onDelete={puedeEliminarEsteComp ? () => setDeleteData({ kind: 'componente', id: comp.id }) : undefined}
                 />
               </View>
             );
