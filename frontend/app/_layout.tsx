@@ -59,9 +59,10 @@ const InitialLayout = () => {
 
     if (!userProfile?.mustChangePassword && accessProfile) {
       // ── 4. PostLoginRedirect: usuarios no-superadmin van directo a /proyectos ─
-      // Superadministrador permanece en /. Cualquier otro usuario que aterrice en /
-      // es redirigido a /proyectos (su punto de entrada operativo).
-      if (rootSegment === '' && !accessProfile.esSuperadministrador) {
+      // Superadministrador permanece en /. Usuarios operativos con asignaciones van
+      // a /proyectos (su punto de entrada operativo). Usuarios SIN asignaciones
+      // permanecen en / para ver NoAssignmentsScreen con acceso a perfil y logout.
+      if (rootSegment === '' && !accessProfile.esSuperadministrador && accessProfile.asignaciones.length > 0) {
         router.replace('/proyectos');
         return;
       }
