@@ -163,6 +163,8 @@ export const ProyectoEquipo: React.FC<Props> = ({ proyectoId, isAdmin }) => {
   const [usuariosOpts, setUsuariosOpts] = useState<SelectOption[]>([]);
 
   const [loading, setLoading] = useState(true);
+  // `refreshing` es true solo al recargar miembros post-mutación → no borra la UI
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [showForm, setShowForm] = useState(false);
@@ -187,62 +189,65 @@ export const ProyectoEquipo: React.FC<Props> = ({ proyectoId, isAdmin }) => {
   // Modal detalle miembro
   const [miembroDetalle, setMiembroDetalle] = useState<ProyectoMiembro | null>(null);
 
-  // ── Carga inicial ──────────────────────────────────────────────────────────
+  // ── Solo recarga la lista de miembros (post-mutación, sin spinner completo) ──
+  const refrescarMiembros = async () => {
+    setRefreshing(true);
+    try {
+      const lista = await listarMiembrosUseCase.ejecutar(proyectoId);
+      setMiembros(lista);
+    } catch (err) {
+      console.error('Error al refrescar miembros', err);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  // ── Carga inicial en paralelo (roles/usuarios/componentes/metas no cambian) ─
   const cargar = async () => {
     setLoading(true);
     setError(null);
 
     try {
-      const miembrosList = await listarMiembrosUseCase.ejecutar(proyectoId);
-      setMiembros(miembrosList);
-    } catch (err) {
-      console.error('Error al listar miembros del proyecto', err);
-      setError('No se pudo cargar el equipo del proyecto.');
-      setLoading(false);
-      return;
-    }
+      if (isAdmin) {
+        // Todas las llamadas en paralelo → tiempo = la más lenta, no la suma
+        const [miembrosList, rolesList, todosUsuarios, compList, metasList] = await Promise.all([
+          listarMiembrosUseCase.ejecutar(proyectoId),
+          listarRolesActivosUseCase.ejecutar().catch(() => [] as Rol[]),
+          listarUsuariosUseCase.ejecutar().catch(() => []),
+          listarComponentesProyectoUseCase.ejecutar(proyectoId).catch(() => [] as ComponentOption[]),
+          listarMetasProyectoUseCase.ejecutar(proyectoId).catch(() => [] as Meta[]),
+        ]);
 
-    if (isAdmin) {
-      try {
-        const rolesList = await listarRolesActivosUseCase.ejecutar();
-        setRoles(rolesList);
-        if (rolesList.length > 0) setRolId(rolesList[0].id);
-      } catch (err) {
-        console.error('Error al listar roles activos', err);
-      }
+        setMiembros(miembrosList);
 
-      try {
-        const todosUsuarios = await listarUsuariosUseCase.ejecutar();
+        if (rolesList.length > 0) {
+          setRoles(rolesList);
+          setRolId(rolesList[0].id);
+        }
+
         setUsuariosOpts(
           todosUsuarios
-            .filter((u) => u.isActive)
-            .map((u) => ({
+            .filter((u: any) => u.isActive)
+            .map((u: any) => ({
               id: u.username,
               name: u.nombreCompleto || u.username,
               description: u.username,
               photoUrl: u.photoUrl,
             }))
         );
-      } catch (err) {
-        console.error('Error al cargar usuarios', err);
-      }
 
-      try {
-        const compList = await listarComponentesProyectoUseCase.ejecutar(proyectoId);
         setComponentes(compList);
-      } catch (err) {
-        console.error('Error al listar componentes', err);
+        setMetas(metasList.filter((m: Meta) => m.activo));
+      } else {
+        const miembrosList = await listarMiembrosUseCase.ejecutar(proyectoId);
+        setMiembros(miembrosList);
       }
-
-      try {
-        const metasList = await listarMetasProyectoUseCase.ejecutar(proyectoId);
-        setMetas(metasList.filter((m) => m.activo));
-      } catch (err) {
-        console.error('Error al listar metas', err);
-      }
+    } catch (err) {
+      console.error('Error al cargar equipo', err);
+      setError('No se pudo cargar el equipo del proyecto.');
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   useEffect(() => { cargar(); }, [proyectoId]);
@@ -329,7 +334,8 @@ export const ProyectoEquipo: React.FC<Props> = ({ proyectoId, isAdmin }) => {
         );
       }
       resetForm();
-      await cargar();
+      // Solo refresca miembros, sin full spinner
+      await refrescarMiembros();
     } catch (e: any) {
       setFormErr(e?.response?.data?.error ?? 'Error al guardar la asignación.');
     } finally {
@@ -381,11 +387,14 @@ export const ProyectoEquipo: React.FC<Props> = ({ proyectoId, isAdmin }) => {
       titulo: 'Retirar del proyecto',
       mensaje: `¿Confirmas retirar a ${nombreMiembro} del proyecto? Se eliminarán todas sus asignaciones de rol.`,
       onOk: async () => {
+        // Optimista: quitar inmediatamente de la lista local, luego sincronizar
+        setMiembros((prev) => prev.filter((m) => m.id !== miembroId));
         try {
           await quitarAsignacionUseCase.ejecutar(proyectoId, miembroId);
-          await cargar();
+          await refrescarMiembros();
         } catch {
           setError('No se pudo eliminar el miembro.');
+          await refrescarMiembros(); // revertir
         }
       },
     });
@@ -398,7 +407,7 @@ export const ProyectoEquipo: React.FC<Props> = ({ proyectoId, isAdmin }) => {
       onOk: async () => {
         try {
           await retirarRolUseCase.ejecutar(proyectoId, asignacionId);
-          await cargar();
+          await refrescarMiembros();
         } catch {
           setError('No se pudo retirar el rol.');
         }
@@ -420,7 +429,12 @@ export const ProyectoEquipo: React.FC<Props> = ({ proyectoId, isAdmin }) => {
     <Card padding="md" style={styles.card}>
       {/* Header del panel */}
       <View style={styles.header}>
-        <Text style={styles.titulo}>Equipo del Proyecto</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs } as any}>
+          <Text style={styles.titulo}>Equipo del Proyecto</Text>
+          {refreshing && (
+            <ActivityIndicator size="small" color={colors.primary} style={{ marginLeft: 6 }} />
+          )}
+        </View>
         {isAdmin && (
           <Button
             label={showForm ? 'Cancelar' : '+ Agregar'}

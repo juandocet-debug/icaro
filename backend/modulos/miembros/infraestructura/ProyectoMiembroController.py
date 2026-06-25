@@ -13,24 +13,56 @@ from ..aplicacion.RetirarMiembroDelProyectoUseCase import RetirarMiembroDelProye
 
 User = get_user_model()
 
-def _serialize_miembro(m, request=None):
+
+def _build_roles_por_usuario(proyecto_id):
+    """
+    Carga TODOS los roles activos del proyecto en 1 sola query y devuelve
+    un dict { usuario_id → [UsuarioRolModel, ...] } listo para _serialize_miembro.
+    Elimina el patrón N+1: antes se lanzaba 1 query por miembro, ahora es 1 total.
+    """
+    roles_qs = (
+        UsuarioRolModel.objects
+        .filter(proyecto_id=proyecto_id, activo=True)
+        .select_related('rol')
+    )
+    result = {}
+    for ur in roles_qs:
+        result.setdefault(ur.usuario_id, []).append(ur)
+    return result
+
+
+def _serialize_miembro(m, request=None, roles_por_usuario=None):
+    """
+    Serializa un miembro del proyecto.
+    - Si `roles_por_usuario` está disponible, usa el dict precargado (0 queries extra).
+    - Si no, hace la query puntual (solo para mutaciones individuales donde 1 query es aceptable).
+    """
     usuario = m.usuario
     perfil = getattr(usuario, 'profile', None)
     nombre = f'{usuario.first_name} {usuario.last_name}'.strip() or usuario.username
-    
-    user_roles = UsuarioRolModel.objects.filter(usuario=usuario, proyecto_id=m.proyecto_id, activo=True).select_related('rol')
-    roles_list = []
-    for ur in user_roles:
-        roles_list.append({
+
+    if roles_por_usuario is not None:
+        user_roles = roles_por_usuario.get(usuario.id, [])
+    else:
+        user_roles = list(
+            UsuarioRolModel.objects
+            .filter(usuario=usuario, proyecto_id=m.proyecto_id, activo=True)
+            .select_related('rol')
+        )
+
+    roles_list = [
+        {
             'id': str(ur.id),
             'rol_id': str(ur.rol.id),
             'rol_nombre': ur.rol.nombre,
             'componente_id': str(ur.componente_id) if ur.componente_id else None,
             'accion_id': str(ur.accion_id) if ur.accion_id else None,
-        })
-        
-    first_rol = user_roles.first() if user_roles.exists() else None
-    
+        }
+        for ur in user_roles
+    ]
+
+    first_rol = user_roles[0] if user_roles else None
+
     foto_url = None
     if perfil and perfil.photo:
         try:
@@ -54,6 +86,7 @@ def _serialize_miembro(m, request=None):
         'roles': roles_list,
     }
 
+
 class ProyectoMiembroListCreateController(APIView):
     def get_permissions(self):
         return [IsAuthenticated()]
@@ -68,8 +101,18 @@ class ProyectoMiembroListCreateController(APIView):
         except PermissionError as e:
             return Response({'ok': False, 'error': str(e)}, status=403)
 
-        miembros = ProyectoMiembroModel.objects.filter(proyecto_id=proyecto_id).select_related('usuario', 'usuario__profile')
-        return Response({'ok': True, 'datos': [_serialize_miembro(m, request) for m in miembros]}, status=200)
+        # 2 queries totales: 1 miembros + 1 todos los roles del proyecto (sin N+1)
+        miembros = (
+            ProyectoMiembroModel.objects
+            .filter(proyecto_id=proyecto_id)
+            .select_related('usuario', 'usuario__profile')
+        )
+        roles_por_usuario = _build_roles_por_usuario(proyecto_id)
+
+        return Response(
+            {'ok': True, 'datos': [_serialize_miembro(m, request, roles_por_usuario) for m in miembros]},
+            status=200,
+        )
 
     def post(self, request, proyecto_id):
         if not ProyectoModel.objects.filter(id=proyecto_id).exists():
@@ -105,11 +148,14 @@ class ProyectoMiembroListCreateController(APIView):
                 rol_id=rol_id,
                 componente_id=componente_id,
                 accion_id=accion_id,
-                agregado_por_id=request.user.id
+                agregado_por_id=request.user.id,
             )
+            m.refresh_from_db()
+            m.usuario = User.objects.select_related('profile').get(pk=m.usuario_id)
             return Response({'ok': True, 'datos': _serialize_miembro(m, request)}, status=201)
         except ValueError as e:
             return Response({'ok': False, 'error': str(e)}, status=400)
+
 
 class ProyectoMiembroDetailController(APIView):
     def get_permissions(self):
@@ -132,6 +178,7 @@ class ProyectoMiembroDetailController(APIView):
             return Response({'ok': True, 'mensaje': 'Miembro eliminado.'}, status=200)
         except ValueError as e:
             return Response({'ok': False, 'error': str(e)}, status=404)
+
 
 class ProyectoMiembroRolDetailController(APIView):
     def get_permissions(self):
@@ -162,11 +209,13 @@ class ProyectoMiembroRolDetailController(APIView):
                 asignacion_id=asignacion_id,
                 rol_id=rol_id,
                 componente_id=componente_id,
-                accion_id=accion_id
+                accion_id=accion_id,
             )
+            m.refresh_from_db()
+            m.usuario = User.objects.select_related('profile').get(pk=m.usuario_id)
             return Response({'ok': True, 'datos': _serialize_miembro(m, request)}, status=200)
         except ValueError as e:
-            status_code = 404 if "no encontrada" in str(e) or "no encontrado" in str(e) else 400
+            status_code = 404 if 'no encontrada' in str(e) or 'no encontrado' in str(e) else 400
             return Response({'ok': False, 'error': str(e)}, status=status_code)
 
     def delete(self, request, proyecto_id, asignacion_id):
