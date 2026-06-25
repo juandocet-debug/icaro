@@ -43,9 +43,9 @@ export const ProyectoMetasComponentes: React.FC<Props> = ({ proyectoId, isAdmin 
     'administrador_proyecto', 'coordinador_proyecto', 'coordinador_general',
   ]);
 
-  /** Puede editar metas: lo anterior + Coord. Componente */
+  /** Puede editar metas: Superadmin, Coord. Proyecto, Coord. General, Admin Proyecto */
   const puedeEditarMeta = isSuperAdmin || tieneRolEnProyecto([
-    'administrador_proyecto', 'coordinador_proyecto', 'coordinador_general', 'coordinador_componente',
+    'administrador_proyecto', 'coordinador_proyecto', 'coordinador_general',
   ]);
 
   /** Puede eliminar metas: solo Superadmin */

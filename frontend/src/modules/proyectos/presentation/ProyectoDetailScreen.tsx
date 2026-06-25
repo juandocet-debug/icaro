@@ -92,9 +92,14 @@ export const ProyectoDetailScreen: React.FC<Props> = ({ proyectoId }) => {
   const canEdit = isGestor || isAdmin;
   const canVerEquipo = isSuperAdmin || canInProject('miembros.ver', proyectoId);
   const canManageEquipo = isSuperAdmin || canInProject('miembros.asignar', proyectoId);
-  const showMisActividades = accessProfile?.asignaciones?.some(
+  const isCoordinadorOAdmin = isSuperAdmin || (accessProfile?.asignaciones?.some(
+    (a) => a.proyectoId === proyectoId && 
+    ['superadministrador', 'administrador_proyecto', 'coordinador_proyecto', 'coordinador_general', 'coordinador_componente'].includes(a.rolCodigo)
+  ) ?? false);
+
+  const showMisActividades = !isCoordinadorOAdmin && (accessProfile?.asignaciones?.some(
     (a) => a.proyectoId === proyectoId && a.rolCodigo === 'profesional_carga'
-  ) ?? false;
+  ) ?? false);
 
   useEffect(() => {
     const cargar = async () => {
