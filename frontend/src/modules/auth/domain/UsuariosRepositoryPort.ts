@@ -14,6 +14,8 @@ export interface UsuarioEntity {
   asignacionesCount: number;
   /** URL absoluta pública a la foto de perfil, o null si no tiene. */
   photoUrl: string | null;
+  /** Solo presente en la respuesta de creación. El admin debe entregársela al usuario. */
+  tempPassword?: string | null;
 }
 
 

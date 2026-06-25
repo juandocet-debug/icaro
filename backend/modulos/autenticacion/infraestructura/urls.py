@@ -15,9 +15,35 @@ class ThrottledTokenObtainPairView(TokenObtainPairView):
     """Login: valida credenciales y devuelve tokens en body + cookies HTTP-Only."""
     throttle_classes = [LoginRateThrottle]
 
+    # Configuración de lockout
+    _MAX_INTENTOS  = 10     # intentos fallidos antes de bloquear
+    _LOCKOUT_SEG   = 900    # 15 minutos de bloqueo
+
+    def _cache_key(self, username: str) -> str:
+        return f"login_fails:{username.lower().strip()}"
+
     def post(self, request, *args, **kwargs):
-        username = request.data.get('username')
+        from django.core.cache import cache
+
+        username = (request.data.get('username') or '').strip()
+
+        # ── Guardia: bloquear si ya tiene demasiados intentos ──────────────────
         if username:
+            key      = self._cache_key(username)
+            intentos = cache.get(key, 0)
+            if intentos >= self._MAX_INTENTOS:
+                ttl = cache.ttl(key) if hasattr(cache, 'ttl') else self._LOCKOUT_SEG
+                return Response(
+                    {
+                        'detail': (
+                            f'Cuenta bloqueada temporalmente por múltiples intentos fallidos. '
+                            f'Intente de nuevo en {ttl // 60 or 15} minutos.'
+                        )
+                    },
+                    status=429
+                )
+
+            # ── Bloquear login de cuentas de consulta pública ─────────────────
             try:
                 user = User.objects.get(username=username)
                 from modulos.roles.infraestructura.models import UsuarioRolModel
@@ -25,7 +51,20 @@ class ThrottledTokenObtainPairView(TokenObtainPairView):
                     return Response({'detail': 'La consulta pública no tiene permisos para iniciar sesión.'}, status=403)
             except User.DoesNotExist:
                 pass
+
         response = super().post(request, *args, **kwargs)
+
+        # ── Actualizar contador según resultado ─────────────────────────────────
+        if username:
+            if response.status_code == 200:
+                # Login exitoso → resetear contador
+                cache.delete(self._cache_key(username))
+            else:
+                # Fallo → incrementar contador con TTL
+                key      = self._cache_key(username)
+                intentos = cache.get(key, 0) + 1
+                cache.set(key, intentos, timeout=self._LOCKOUT_SEG)
+
         if response.status_code == 200:
             set_auth_cookies(response, response.data.get('access', ''), response.data.get('refresh'))
         return response

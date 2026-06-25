@@ -17,6 +17,8 @@ type ApiUsuario = {
   asignaciones_count: number;
   /** URL absoluta de la foto. El backend ya construye la URL completa. */
   foto_url: string | null;
+  /** Solo presente en la respuesta de creación (POST). Nunca en listados. */
+  temp_password?: string;
 };
 
 type ApiAsignacion = {
@@ -44,6 +46,7 @@ const mapearUsuario = (u: ApiUsuario): UsuarioEntity => ({
   isActive: u.is_active,
   asignacionesCount: u.asignaciones_count ?? 0,
   photoUrl: u.foto_url ?? null,
+  tempPassword: u.temp_password ?? null,
 });
 
 const mapearAsignacion = (a: ApiAsignacion): UsuarioAsignacion => ({

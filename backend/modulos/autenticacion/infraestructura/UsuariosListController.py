@@ -104,7 +104,7 @@ class UsuariosListController(APIView):
 
         use_case = CrearUsuarioUseCase()
         try:
-            u = use_case.ejecutar(
+            u, temp_password = use_case.ejecutar(
                 cedula=cedula,
                 primer_nombre=primer_nombre,
                 segundo_nombre=segundo_nombre,
@@ -113,7 +113,11 @@ class UsuariosListController(APIView):
                 email=email,
                 telefono=telefono
             )
-            return Response({'ok': True, 'datos': _s(u, request)}, status=201)
+            datos = _s(u, request)
+            # temp_password se incluye UNA VEZ en la respuesta para que el admin
+            # se la entregue al nuevo usuario. En la BD siempre queda hasheada.
+            datos['temp_password'] = temp_password
+            return Response({'ok': True, 'datos': datos}, status=201)
         except ValueError as e:
             return Response({'ok': False, 'error': str(e)}, status=400)
 

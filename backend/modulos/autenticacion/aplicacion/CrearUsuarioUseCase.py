@@ -1,8 +1,19 @@
 import re
+import secrets
+import string
 from django.contrib.auth import get_user_model
 from modulos.autenticacion.infraestructura.models import ProfileModel
 
 User = get_user_model()
+
+_PASSWORD_ALPHABET = string.ascii_letters + string.digits
+
+def _generar_password_temporal() -> str:
+    """Genera contraseña aleatoria segura de 12 caracteres (letras + dígitos).
+    Usa secrets.choice para máxima entropía criptográfica.
+    """
+    return ''.join(secrets.choice(_PASSWORD_ALPHABET) for _ in range(12))
+
 
 class CrearUsuarioUseCase:
     def ejecutar(self, cedula: str, primer_nombre: str, segundo_nombre: str, primer_apellido: str, segundo_apellido: str, email: str, telefono: str):
@@ -34,17 +45,20 @@ class CrearUsuarioUseCase:
 
         # 5. Crear usuario y perfil de forma atómica
         from django.db import transaction
+
+        # SECURITY: contraseña aleatoria segura — nunca la cédula.
+        # Se retorna en texto plano UNA VEZ para que el admin se la entregue al usuario.
+        # En la BD siempre queda como hash PBKDF2.
+        password_temporal = _generar_password_temporal()
+
         with transaction.atomic():
-            # Crear usuario con is_staff=False
             user = User.objects.create_user(
                 username=cedula,
                 email=email,
-                password=cedula,
+                password=password_temporal,
                 is_staff=False
             )
 
-            # El signal post_save puede haber creado un perfil vacío ya.
-            # Usamos get_or_create para evitar UNIQUE constraint y luego actualizamos.
             perfil, _ = ProfileModel.objects.get_or_create(user=user)
             perfil.cedula = cedula
             perfil.telefono = telefono or None
@@ -55,4 +69,7 @@ class CrearUsuarioUseCase:
             perfil.must_change_password = True
             perfil.save()
 
-        return user
+        # Retornar el usuario Y la contraseña temporal para que el controller
+        # la incluya en la respuesta (se muestra una sola vez al admin).
+        return user, password_temporal
+

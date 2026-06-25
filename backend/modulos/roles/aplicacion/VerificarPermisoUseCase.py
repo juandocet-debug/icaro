@@ -35,13 +35,10 @@ class VerificarPermisoUseCase:
         except User.DoesNotExist:
             raise PermissionError("Usuario no encontrado.")
 
-        # 1. Superadministrador (is_staff o is_superuser): acceso total.
-        if codigo_permiso.startswith('metas.'):
-            if usuario.is_superuser:
-                return True
-        else:
-            if usuario.is_staff or usuario.is_superuser:
-                return True
+        # 1. Solo is_superuser tiene acceso total a la aplicación.
+        # is_staff únicamente permite el panel admin de Django — NO otorga privilegios de app.
+        if usuario.is_superuser:
+            return True
 
         # 2. Validaciones de jerarquía cuando se pasan IDs de alcance.
         if componente_id and proyecto_id:

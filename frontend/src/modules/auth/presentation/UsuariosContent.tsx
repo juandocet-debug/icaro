@@ -74,6 +74,9 @@ export const UsuariosContent: React.FC<UsuariosContentProps> = ({ showForm, setS
   const [selectedUserForAsig, setSelectedUserForAsig] = useState<UsuarioEntity | null>(null);
   const [editingUser, setEditingUser] = useState<UsuarioEntity | null>(null);
   const [deletingUser, setDeletingUser] = useState<UsuarioEntity | null>(null);
+  // Modal de credenciales temporales (mostrado UNA VEZ tras crear usuario)
+  const [credenciales, setCredenciales] = useState<{ username: string; password: string } | null>(null);
+  const [copiado, setCopiado] = useState(false);
 
   const setField = (field: keyof FormState) => (val: string) =>
     setForm(prev => ({ ...prev, [field]: val }));
@@ -107,7 +110,7 @@ export const UsuariosContent: React.FC<UsuariosContentProps> = ({ showForm, setS
     setSaving(true);
     setFormErr(null);
     try {
-      await crearUsuarioUseCase.ejecutar({
+      const nuevoUsuario = await crearUsuarioUseCase.ejecutar({
         cedula: form.cedula.trim(),
         primer_nombre: form.primerNombre.trim(),
         segundo_nombre: form.segundoNombre.trim() || undefined,
@@ -119,6 +122,10 @@ export const UsuariosContent: React.FC<UsuariosContentProps> = ({ showForm, setS
       limpiarForm();
       setShowForm(false);
       await cargar();
+      // Mostrar credenciales temporales UNA VEZ
+      if (nuevoUsuario.tempPassword) {
+        setCredenciales({ username: nuevoUsuario.username, password: nuevoUsuario.tempPassword });
+      }
     } catch (e: any) {
       setFormErr(e?.response?.data?.error ?? 'Error al crear el usuario.');
     } finally {
@@ -159,6 +166,76 @@ export const UsuariosContent: React.FC<UsuariosContentProps> = ({ showForm, setS
 
   return (
     <View style={styles.contentContainer}>
+
+      {/* ── Modal Credenciales Temporales (se muestra UNA VEZ tras crear usuario) ── */}
+      <Modal visible={!!credenciales} transparent animationType="fade">
+        <View style={styles.overlay}>
+          <Card padding="lg" style={[styles.modalCard, { maxWidth: 420 }]}>
+            {/* Header */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.md }}>
+              <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: colors.success + '22', alignItems: 'center', justifyContent: 'center' }}>
+                <Ionicons name="key-outline" size={20} color={colors.success} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.formTitulo, { fontSize: 16 }]}>Usuario creado</Text>
+                <Text style={{ color: colors.textSecondary, fontSize: 12 }}>Entrega estas credenciales al usuario. Solo se muestran una vez.</Text>
+              </View>
+            </View>
+
+            {/* Advertencia */}
+            <View style={{ backgroundColor: '#FFF3CD', borderRadius: 8, padding: spacing.sm, marginBottom: spacing.md, flexDirection: 'row', gap: spacing.xs, alignItems: 'flex-start' }}>
+              <Ionicons name="warning-outline" size={16} color="#856404" style={{ marginTop: 1 }} />
+              <Text style={{ color: '#856404', fontSize: 12, flex: 1 }}>
+                Esta contraseña NO se puede recuperar después. Cópiala ahora.
+              </Text>
+            </View>
+
+            {/* Credenciales */}
+            <View style={{ gap: spacing.sm, marginBottom: spacing.md }}>
+              <View style={{ backgroundColor: colors.background, borderRadius: 8, padding: spacing.sm }}>
+                <Text style={{ color: colors.textSecondary, fontSize: 11, marginBottom: 2 }}>USUARIO (CÉDULA)</Text>
+                <Text style={{ color: colors.text, fontSize: 15, fontWeight: '600', letterSpacing: 1 }}>
+                  {credenciales?.username}
+                </Text>
+              </View>
+              <View style={{ backgroundColor: colors.background, borderRadius: 8, padding: spacing.sm }}>
+                <Text style={{ color: colors.textSecondary, fontSize: 11, marginBottom: 2 }}>CONTRASEÑA TEMPORAL</Text>
+                <Text style={{ color: colors.primary, fontSize: 18, fontWeight: '700', letterSpacing: 2, fontFamily: Platform.OS === 'web' ? 'monospace' : 'Courier' }}>
+                  {credenciales?.password}
+                </Text>
+              </View>
+            </View>
+
+            {/* Acciones */}
+            <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+              <TouchableOpacity
+                style={{ flex: 1, backgroundColor: copiado ? colors.success : colors.primary, borderRadius: 8, padding: spacing.sm + 2, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6 }}
+                onPress={async () => {
+                  if (credenciales) {
+                    const texto = `Usuario: ${credenciales.username}\nContraseña: ${credenciales.password}`;
+                    if (Platform.OS === 'web') {
+                      try { await navigator.clipboard.writeText(texto); } catch {}
+                    }
+                    setCopiado(true);
+                    setTimeout(() => setCopiado(false), 2000);
+                  }
+                }}
+              >
+                <Ionicons name={copiado ? 'checkmark' : 'copy-outline'} size={16} color="#fff" />
+                <Text style={{ color: '#fff', fontWeight: '600', fontSize: 13 }}>
+                  {copiado ? 'Copiado' : 'Copiar credenciales'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{ paddingHorizontal: spacing.md, paddingVertical: spacing.sm + 2, borderRadius: 8, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' }}
+                onPress={() => { setCredenciales(null); setCopiado(false); }}
+              >
+                <Text style={{ color: colors.text, fontWeight: '600', fontSize: 13 }}>Listo</Text>
+              </TouchableOpacity>
+            </View>
+          </Card>
+        </View>
+      </Modal>
 
       {/* ── Modal Nuevo Usuario ── */}
       <Modal visible={showForm} transparent animationType="fade">
