@@ -61,50 +61,64 @@ export const ProyectoEquipo: React.FC<Props> = ({ proyectoId, isAdmin }) => {
   } | null>(null);
 
   const cargar = async () => {
+    setLoading(true);
+    setError(null);
+
+    // 1. Cargar miembros del proyecto (obligatorio)
     try {
-      setLoading(true);
-      setError(null);
-      
-      const [miembrosList, rolesList] = await Promise.all([
-        listarMiembrosUseCase.ejecutar(proyectoId),
-        isAdmin ? listarRolesActivosUseCase.ejecutar() : Promise.resolve([]),
-      ]);
-
+      const miembrosList = await listarMiembrosUseCase.ejecutar(proyectoId);
       setMiembros(miembrosList);
-      setRoles(rolesList);
+    } catch (err) {
+      console.error('Error al listar miembros del proyecto', err);
+      setError('No se pudo cargar el equipo del proyecto.');
+      setLoading(false);
+      return;
+    }
 
-      if (isAdmin) {
-        try {
-          const todosUsuarios = await listarUsuariosUseCase.ejecutar();
-          setUsuariosOpts(
-            todosUsuarios
-              .filter((u) => u.isActive)
-              .map((u) => ({
-                id: u.username,
-                name: u.nombreCompleto || u.username,
-                description: u.username,
-                photoUrl: u.photoUrl,
-              }))
-          );
-        } catch (err) {
-          console.error('Error al cargar la lista de usuarios para buscador', err);
+    // 2. Cargar roles activos (opcional, solo para administrador)
+    let rolesList: Rol[] = [];
+    if (isAdmin) {
+      try {
+        rolesList = await listarRolesActivosUseCase.ejecutar();
+        setRoles(rolesList);
+        if (rolesList.length > 0) {
+          setRolId(rolesList[0].id);
         }
+      } catch (err) {
+        console.error('Error al listar roles activos', err);
       }
-      
-      if (rolesList.length > 0) {
-        setRolId(rolesList[0].id);
-      }
+    }
 
-      // Cargar componentes del proyecto si es administrador
-      if (isAdmin) {
+    // 3. Cargar lista de usuarios (opcional, solo para administrador)
+    if (isAdmin) {
+      try {
+        const todosUsuarios = await listarUsuariosUseCase.ejecutar();
+        setUsuariosOpts(
+          todosUsuarios
+            .filter((u) => u.isActive)
+            .map((u) => ({
+              id: u.username,
+              name: u.nombreCompleto || u.username,
+              description: u.username,
+              photoUrl: u.photoUrl,
+            }))
+        );
+      } catch (err) {
+        console.error('Error al cargar la lista de usuarios para buscador', err);
+      }
+    }
+
+    // 4. Cargar componentes del proyecto (opcional, solo para administrador)
+    if (isAdmin) {
+      try {
         const compList = await listarComponentesProyectoUseCase.ejecutar(proyectoId);
         setComponentes(compList);
+      } catch (err) {
+        console.error('Error al listar componentes del proyecto', err);
       }
-    } catch {
-      setError('No se pudo cargar el equipo o la configuración de roles.');
-    } finally {
-      setLoading(false);
     }
+
+    setLoading(false);
   };
 
   useEffect(() => {
