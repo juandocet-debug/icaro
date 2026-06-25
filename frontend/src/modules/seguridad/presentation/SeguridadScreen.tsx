@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Platform, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, Platform, ScrollView, useWindowDimensions } from 'react-native';
 import { AppShell } from '../../../shared/components/AppShell';
 import { Button } from '../../../shared/components/Button';
 import { SectionTabs } from '../../../shared/components/SectionTabs';
@@ -25,6 +25,8 @@ import {
 type TabType = 'usuarios' | 'roles' | 'permisos';
 
 export const SeguridadScreen: React.FC = () => {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
   const { isAuthenticated } = useAuth();
   const { accessProfile } = useAccess();
   const [activeTab, setActiveTab] = useState<TabType>('usuarios');
@@ -106,9 +108,11 @@ export const SeguridadScreen: React.FC = () => {
         
         {canManageSecurity && <>
         {/* SecurityHeader */}
-        <View style={styles.securityHeader}>
-          <Text style={styles.securityTitle}>SEGURIDAD Y ACCESO</Text>
-          <Text style={styles.securitySubtitle}>Administra usuarios, roles y permisos</Text>
+        <View style={[styles.securityHeader, isMobile && styles.securityHeaderMobile]}>
+          <View>
+            <Text style={[styles.securityTitle, isMobile && { fontSize: 18 }]}>SEGURIDAD Y ACCESO</Text>
+            <Text style={styles.securitySubtitle}>Administra usuarios, roles y permisos</Text>
+          </View>
         </View>
 
         {/* SectionTabs */}
@@ -123,7 +127,7 @@ export const SeguridadScreen: React.FC = () => {
         />
 
         {/* SectionHeader */}
-        <View style={styles.sectionHeader}>
+        <View style={[styles.sectionHeader, isMobile && styles.sectionHeaderMobile]}>
           <Text style={styles.sectionTitle}>
             {activeTab === 'usuarios'
               ? 'Gestión de Usuarios'
@@ -135,7 +139,7 @@ export const SeguridadScreen: React.FC = () => {
             <Button
               label="+ Nuevo usuario"
               onPress={() => setShowUserForm(true)}
-              style={styles.actionBtn}
+              style={[styles.actionBtn, isMobile && { alignSelf: 'stretch' }]}
             />
           )}
           {activeTab === 'roles' && (
@@ -145,7 +149,7 @@ export const SeguridadScreen: React.FC = () => {
                 setRolEditar(null);
                 setShowCreateModal(true);
               }}
-              style={styles.actionBtn}
+              style={[styles.actionBtn, isMobile && { alignSelf: 'stretch' }]}
             />
           )}
         </View>
@@ -199,8 +203,16 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch',
   },
   securityHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: spacing.md,
-  },
+  } as any,
+  securityHeaderMobile: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+  } as any,
   securityTitle: {
     fontFamily: typography.fontFamily,
     fontSize: typography.sizes.xl,
@@ -227,7 +239,11 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.sm,
     minHeight: 48,
     width: '100%',
-  },
+  } as any,
+  sectionHeaderMobile: {
+    flexDirection: 'column',
+    alignItems: 'stretch',
+  } as any,
   sectionTitle: {
     fontFamily: typography.fontFamily,
     fontSize: typography.sizes.lg,

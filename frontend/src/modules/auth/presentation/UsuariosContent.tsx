@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import {
   View, Text, StyleSheet, TextInput, ActivityIndicator,
-  TouchableOpacity, Modal, ScrollView, Platform,
+  TouchableOpacity, Modal, ScrollView, Platform, useWindowDimensions,
 } from 'react-native';
 import { Card }         from '../../../shared/components/Card';
 import { Button }       from '../../../shared/components/Button';
@@ -53,6 +53,8 @@ const FORM_EMPTY: FormState = {
 };
 
 export const UsuariosContent: React.FC<UsuariosContentProps> = ({ showForm, setShowForm }) => {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
   const { accessProfile } = useAccess();
   const { userProfile } = useAuth();
   const isSuperAdmin = accessProfile?.esSuperadministrador === true;
@@ -333,10 +335,101 @@ export const UsuariosContent: React.FC<UsuariosContentProps> = ({ showForm, setS
 
       {!!error && <ErrorMessage message={error} />}
 
-      {/* ── Tabla ── */}
+      {/* ── Lista: Tabla en web, Cards en móvil ── */}
       {loading ? (
         <ActivityIndicator size="large" color={colors.primary} style={styles.loader} />
+      ) : isMobile ? (
+        /* ── Cards móvil ── */
+        <View style={styles.cardList}>
+          {usuariosFiltrados.length === 0 && (
+            <Text style={styles.vacio}>No se encontraron usuarios.</Text>
+          )}
+          {usuariosFiltrados.map((u, idx) => (
+            <View key={u.id} style={[styles.userCard, !u.isActive && { opacity: 0.6 }]}>
+              {/* Avatar + Info */}
+              <View style={styles.userCardTop}>
+                <UserAvatar
+                  name={u.nombreCompleto || u.username}
+                  photoUrl={u.photoUrl}
+                  size={44}
+                  fallbackColor={AVATAR_COLORS[idx % AVATAR_COLORS.length]}
+                />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.userCardName} numberOfLines={1}>
+                    {u.nombreCompleto || u.username}
+                  </Text>
+                  <Text style={styles.userCardSub} numberOfLines={1}>@{u.username}</Text>
+                  {!!u.email && <Text style={styles.userCardEmail} numberOfLines={1}>{u.email}</Text>}
+                </View>
+                {/* Badge estado */}
+                <View style={[styles.badge, { backgroundColor: u.isActive ? 'rgba(40,167,111,0.1)' : colors.border }]}>
+                  <Text style={[styles.badgeTxt, { color: u.isActive ? colors.success : colors.textSecondary }]}>
+                    {u.isActive ? 'Activo' : 'Inactivo'}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Asignaciones row */}
+              <View style={styles.userCardMeta}>
+                {u.isSuperuser ? (
+                  <View style={styles.globalBadge}>
+                    <Ionicons name="shield-checkmark" size={12} color={colors.primary} />
+                    <Text style={styles.globalBadgeTxt}>Superadmin Global</Text>
+                  </View>
+                ) : (
+                  <TouchableOpacity onPress={() => setSelectedUserForAsig(u)}>
+                    <Text style={styles.asignacionesLink}>
+                      {u.asignacionesCount === 0 ? 'Sin asignaciones'
+                        : u.asignacionesCount === 1 ? '1 proyecto'
+                        : `${u.asignacionesCount} proyectos`}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              {/* Acciones */}
+              <View style={styles.userCardActions}>
+                {isSuperAdmin && (
+                  <>
+                    <TouchableOpacity
+                      style={styles.cardActionBtn}
+                      onPress={() => setEditingUser(u)}
+                    >
+                      <Ionicons name="create-outline" size={16} color={colors.primary} />
+                      <Text style={[styles.cardActionTxt, { color: colors.primary }]}>Editar</Text>
+                    </TouchableOpacity>
+                    {!u.isSuperuser && u.id !== userProfile?.userId && (
+                      <TouchableOpacity
+                        style={styles.cardActionBtn}
+                        onPress={() => setDeletingUser(u)}
+                      >
+                        <Ionicons name="trash-outline" size={16} color={colors.error} />
+                        <Text style={[styles.cardActionTxt, { color: colors.error }]}>Eliminar</Text>
+                      </TouchableOpacity>
+                    )}
+                  </>
+                )}
+                {canDesactivar && u.id !== userProfile?.userId && (!u.isSuperuser || isSuperAdmin) && (
+                  <TouchableOpacity
+                    style={[styles.cardActionBtn, { borderColor: u.isActive ? '#ef4444' : colors.success }]}
+                    onPress={() => toggleActivo(u)}
+                  >
+                    <Ionicons
+                      name={u.isActive ? 'pause-circle-outline' : 'play-circle-outline'}
+                      size={16}
+                      color={u.isActive ? '#ef4444' : colors.success}
+                    />
+                    <Text style={[styles.cardActionTxt, { color: u.isActive ? '#ef4444' : colors.success }]}>
+                      {u.isActive ? 'Desactivar' : 'Activar'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+          ))}
+        </View>
       ) : (
+        /* ── Tabla web ── */
         <Card padding="none" style={styles.tabla}>
           {/* Header */}
           <View style={styles.th}>
@@ -415,7 +508,6 @@ export const UsuariosContent: React.FC<UsuariosContentProps> = ({ showForm, setS
 
               {/* Acciones */}
               <View style={[styles.tdCell, { width: 160, flexDirection: 'row', alignItems: 'center', gap: spacing.xs }] as any}>
-                {/* Editar y Eliminar: solo superadmin */}
                 {isSuperAdmin && (
                   <>
                     <TouchableOpacity
@@ -434,7 +526,6 @@ export const UsuariosContent: React.FC<UsuariosContentProps> = ({ showForm, setS
                     )}
                   </>
                 )}
-                {/* Desactivar/Activar: superadmin y admins con permiso */}
                 {canDesactivar &&
                   u.id !== userProfile?.userId &&
                   (!u.isSuperuser || isSuperAdmin) && (
@@ -512,7 +603,7 @@ const styles = StyleSheet.create({
   pillText:    { fontFamily: typography.fontFamily, fontSize: 11, color: colors.textSecondary },
   pillTextActive: { color: colors.surface, fontWeight: typography.weights.bold },
 
-  // Tabla
+  // Tabla (web)
   tabla:      { alignSelf: 'stretch' as any },
   th:         { flexDirection: 'row', paddingVertical: spacing.xs, paddingHorizontal: spacing.lg, borderBottomWidth: 2, borderBottomColor: colors.border },
   thCell:     { fontFamily: typography.fontFamily, fontSize: typography.sizes.xs, fontWeight: typography.weights.bold, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5 } as any,
@@ -532,4 +623,28 @@ const styles = StyleSheet.create({
   asignacionesLink: { fontFamily: typography.fontFamily, fontSize: typography.sizes.xs, color: colors.primary, textDecorationLine: 'underline', fontWeight: typography.weights.medium } as any,
   vacio:       { fontFamily: typography.fontFamily, fontSize: typography.sizes.sm, color: colors.textSecondary, fontStyle: 'italic', padding: spacing.lg },
   actionBtn:   { padding: 4 },
+
+  // Cards móvil
+  cardList: { gap: spacing.sm } as any,
+  userCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    padding: spacing.md,
+    gap: spacing.sm,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
+  } as any,
+  userCardTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm } as any,
+  userCardName: { fontFamily: typography.fontFamily, fontSize: 14, fontWeight: '700', color: colors.textPrimary } as any,
+  userCardSub:  { fontFamily: typography.fontFamily, fontSize: 11, color: colors.textSecondary },
+  userCardEmail:{ fontFamily: typography.fontFamily, fontSize: 11, color: '#6366f1' },
+  userCardMeta: { paddingTop: 4 },
+  userCardActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingTop: 4, borderTopWidth: 1, borderTopColor: '#f1f5f9' } as any,
+  cardActionBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0' } as any,
+  cardActionTxt: { fontFamily: typography.fontFamily, fontSize: 12, fontWeight: '600' } as any,
 });

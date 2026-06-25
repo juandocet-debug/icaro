@@ -312,25 +312,25 @@ export const ProyectoDetailScreen: React.FC<Props> = ({ proyectoId }) => {
       {canVerMetas ? (
         isMobile ? (
           <View style={{ gap: spacing.lg }}>
-            <ProyectoMetasComponentes proyectoId={proyectoId} isAdmin={isAdmin} />
-            {canVerEquipo && <ProyectoEquipo proyectoId={proyectoId} isAdmin={isAdmin} />}
-            <ProyectoTiposDocumento proyectoId={proyectoId} isAdmin={isAdmin} />
+            <ProyectoMetasComponentes proyectoId={proyectoId} isAdmin={canEdit} />
+            {canVerEquipo && <ProyectoEquipo proyectoId={proyectoId} isAdmin={canEdit} />}
+            <ProyectoTiposDocumento proyectoId={proyectoId} isAdmin={canEdit} />
           </View>
         ) : (
           <View style={{ flexDirection: 'row', gap: spacing.lg, alignItems: 'flex-start', width: '100%' }}>
             <View style={{ flex: 1.6, gap: spacing.lg }}>
-              {canVerEquipo && <ProyectoEquipo proyectoId={proyectoId} isAdmin={isAdmin} />}
-              <ProyectoTiposDocumento proyectoId={proyectoId} isAdmin={isAdmin} />
+              {canVerEquipo && <ProyectoEquipo proyectoId={proyectoId} isAdmin={canEdit} />}
+              <ProyectoTiposDocumento proyectoId={proyectoId} isAdmin={canEdit} />
             </View>
             <View style={{ flex: 1, minWidth: 240, gap: spacing.lg }}>
-              <ProyectoMetasComponentes proyectoId={proyectoId} isAdmin={isAdmin} />
+              <ProyectoMetasComponentes proyectoId={proyectoId} isAdmin={canEdit} />
             </View>
           </View>
         )
       ) : (
         isMobile ? (
           <View style={{ gap: spacing.lg }}>
-            {canVerEquipo && <ProyectoEquipo proyectoId={proyectoId} isAdmin={isAdmin} />}
+            {canVerEquipo && <ProyectoEquipo proyectoId={proyectoId} isAdmin={canEdit} />}
             <CollaboratorActivities
               misActividades={misActividades}
               loadingActs={loadingActs}
@@ -350,7 +350,7 @@ export const ProyectoDetailScreen: React.FC<Props> = ({ proyectoId }) => {
               />
             </View>
             <View style={{ flex: 1, minWidth: 240 }}>
-              {canVerEquipo && <ProyectoEquipo proyectoId={proyectoId} isAdmin={isAdmin} />}
+              {canVerEquipo && <ProyectoEquipo proyectoId={proyectoId} isAdmin={canEdit} />}
             </View>
           </View>
         )
