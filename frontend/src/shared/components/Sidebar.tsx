@@ -41,7 +41,6 @@ const NAV_ITEMS: NavItem[] = [
     icon: 'grid',
     route: '/',
     label: 'Inicio',
-    requireSuperAdmin: true,   // Solo superadmin permanece en /
   },
   {
     icon: 'folder-outline',
