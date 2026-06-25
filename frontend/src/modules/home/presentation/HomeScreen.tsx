@@ -280,12 +280,14 @@ export const HomeScreen: React.FC = () => {
           <Text style={styles.noProjectsText}>No hay proyectos activos asignados.</Text>
         )}
 
-        {/* Botón Dinámico de Acción */}
-        <Button
-          label={getShortcutLabel()}
-          onPress={handleShortcutAction}
-          style={styles.btnShortcut}
-        />
+        {/* Botón Dinámico de Acción — solo si hay proyecto o puede crear */}
+        {(selectedProjectId || puedeCrearProyecto) && (
+          <Button
+            label={getShortcutLabel()}
+            onPress={handleShortcutAction}
+            style={styles.btnShortcut}
+          />
+        )}
       </View>
 
       {/* Columna Derecha (35% en Web) — ocultar en móvil */}

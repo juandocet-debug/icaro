@@ -1,5 +1,8 @@
 import React from 'react';
-import { SafeAreaView, ScrollView, StyleSheet, View, ViewStyle, Platform, StyleProp } from 'react-native';
+import {
+  SafeAreaView, ScrollView, StyleSheet, View,
+  ViewStyle, Platform, StyleProp, useWindowDimensions,
+} from 'react-native';
 import { colors } from '../constants/colors';
 import { spacing } from '../constants/spacing';
 
@@ -14,12 +17,25 @@ export const AppShell: React.FC<AppShellProps> = ({
   scrollable = true,
   style,
 }) => {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
+
+  const scrollContentStyle = [
+    styles.scrollContent,
+    isMobile && styles.scrollContentMobile,
+  ];
+
+  const staticContentStyle = [
+    styles.staticContent,
+    isMobile && styles.staticContentMobile,
+  ];
+
   const content = scrollable ? (
-    <ScrollView contentContainerStyle={styles.scrollContent}>
+    <ScrollView contentContainerStyle={scrollContentStyle}>
       {children}
     </ScrollView>
   ) : (
-    <View style={styles.staticContent}>
+    <View style={staticContentStyle}>
       {children}
     </View>
   );
@@ -36,21 +52,25 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
+  // Desktop
   scrollContent: {
     flexGrow: 1,
-    padding: Platform.select({
-      web: spacing.xl,
-      default: spacing.md,
-    }),
+    padding: spacing.xl,
     alignItems: 'center',
     justifyContent: 'center',
   },
   staticContent: {
     flex: 1,
-    padding: Platform.select({
-      web: spacing.xl,
-      default: spacing.md,
-    }),
+    padding: spacing.xl,
     width: '100%',
+  },
+  // Mobile overrides: less padding, content stretches full-width
+  scrollContentMobile: {
+    padding: spacing.sm,
+    alignItems: 'stretch',
+    justifyContent: 'flex-start',
+  },
+  staticContentMobile: {
+    padding: spacing.sm,
   },
 });

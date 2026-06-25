@@ -1,5 +1,8 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
+import {
+  View, Text, TouchableOpacity, ActivityIndicator,
+  StyleSheet, useWindowDimensions,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../../../shared/constants/colors';
 import { spacing } from '../../../../shared/constants/spacing';
@@ -21,38 +24,51 @@ export const ProyectoDetailHeaderActions: React.FC<ProyectoDetailHeaderActionsPr
   eliminando,
   solicitarEliminacion,
 }) => {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
+
   return (
     <View style={styles.actionHeaderBar}>
-      <TouchableOpacity onPress={() => router.back()} style={styles.backButtonCustom} accessibilityLabel="Volver a proyectos">
-        <Ionicons name="arrow-back" size={18} color={colors.primary} />
-        <Text style={styles.backButtonCustomText}>Volver</Text>
+      {/* Volver */}
+      <TouchableOpacity
+        onPress={() => router.back()}
+        style={styles.backButton}
+        accessibilityLabel="Volver a proyectos"
+      >
+        <Ionicons name="arrow-back" size={16} color={colors.primary} />
+        {!isMobile && <Text style={styles.backText}>Volver</Text>}
       </TouchableOpacity>
 
-      <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+      {/* Acciones derecha */}
+      <View style={styles.rightActions}>
         {isGestor && (
-          <TouchableOpacity 
+          <TouchableOpacity
             onPress={() => router.push(`/proyectos/${proyectoId}/dashboard-evidencias` as any)}
-            style={styles.consolaButtonCustom}
+            style={styles.consolaBtn}
             accessibilityLabel="Consola de Evidencias"
           >
-            <Ionicons name="documents-outline" size={15} color="#ffffff" style={{ marginRight: 6 }} />
-            <Text style={styles.consolaButtonCustomText}>Consola de Evidencias</Text>
+            <Ionicons name="documents-outline" size={15} color="#ffffff" />
+            {!isMobile && (
+              <Text style={styles.consolaBtnText}>Consola de Evidencias</Text>
+            )}
           </TouchableOpacity>
         )}
 
         {isSuperAdmin && (
-          <TouchableOpacity 
-            onPress={solicitarEliminacion} 
+          <TouchableOpacity
+            onPress={solicitarEliminacion}
             disabled={eliminando}
-            style={[styles.deleteProjectButtonCustom, eliminando && { opacity: 0.6 }]}
+            style={[styles.deleteBtn, eliminando && { opacity: 0.6 }]}
             accessibilityLabel="Eliminar proyecto"
           >
             {eliminando ? (
               <ActivityIndicator size="small" color="#ffffff" />
             ) : (
               <>
-                <Ionicons name="trash-outline" size={15} color="#ffffff" style={{ marginRight: 6 }} />
-                <Text style={styles.deleteProjectButtonCustomText}>Eliminar proyecto</Text>
+                <Ionicons name="trash-outline" size={15} color="#ffffff" />
+                {!isMobile && (
+                  <Text style={styles.deleteBtnText}>Eliminar proyecto</Text>
+                )}
               </>
             )}
           </TouchableOpacity>
@@ -68,56 +84,63 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: spacing.md,
-    alignSelf: 'stretch' as any,
+    width: '100%',
   } as any,
-  backButtonCustom: {
+  backButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingVertical: 6,
+    paddingVertical: 8,
     paddingHorizontal: 12,
-    borderRadius: 8,
+    borderRadius: 20,
     backgroundColor: '#f1f5f9',
   } as any,
-  backButtonCustomText: {
+  backText: {
     fontFamily: typography.fontFamily,
     fontSize: typography.sizes.sm,
     color: colors.primary,
     fontWeight: typography.weights.bold,
   },
-  consolaButtonCustom: {
+  rightActions: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
+  } as any,
+  consolaBtn: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 6,
     backgroundColor: colors.primary,
-    paddingVertical: 6,
-    paddingHorizontal: 14,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
     borderRadius: 20,
     shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
     elevation: 2,
   } as any,
-  consolaButtonCustomText: {
+  consolaBtnText: {
     fontFamily: typography.fontFamily,
     fontSize: 12,
     color: '#ffffff',
     fontWeight: typography.weights.bold,
   },
-  deleteProjectButtonCustom: {
+  deleteBtn: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 6,
     backgroundColor: colors.error,
-    paddingVertical: 6,
-    paddingHorizontal: 14,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
     borderRadius: 20,
     shadowColor: colors.error,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
     elevation: 2,
   } as any,
-  deleteProjectButtonCustomText: {
+  deleteBtnText: {
     fontFamily: typography.fontFamily,
     fontSize: 12,
     color: '#ffffff',
