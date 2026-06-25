@@ -160,20 +160,20 @@ export const Sidebar: React.FC<SidebarProps> = ({ isExpanded, onToggle }) => {
         })}
       </View>
 
-      {/* Logout */}
+      {/* Logout — siempre visible con color diferenciado */}
       <TouchableOpacity
         style={[
-          styles.navItem,
+          styles.logoutItem,
           isExpanded && styles.navItemExpanded,
-          Platform.OS === 'web' ? ({ cursor: 'pointer' } as any) : {}
+          Platform.OS === 'web' ? ({ cursor: 'pointer', title: 'Cerrar Sesión' } as any) : {}
         ]}
         onPress={logout}
         activeOpacity={0.75}
       >
-        <Ionicons name="log-out-outline" size={20} color="rgba(255,255,255,0.55)" />
-        {isExpanded && (
-          <Text style={styles.navLabel}>Salir</Text>
-        )}
+        <Ionicons name="log-out-outline" size={20} color="#f87171" />
+        <Text style={[styles.navLabel, styles.logoutLabel]}>
+          {isExpanded ? 'Cerrar Sesión' : 'Salir'}
+        </Text>
       </TouchableOpacity>
 
     </View>
@@ -224,6 +224,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'flex-start',
     paddingHorizontal: spacing.sm,
+  },
+  logoutItem: {
+    width: 44,
+    height: 44,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.xs,
+    flexDirection: 'row',
+    gap: 4,
+  },
+  logoutLabel: {
+    color: '#f87171',
+    fontSize: 9,
+    marginLeft: 2,
   },
   navLabel: {
     color: 'rgba(255,255,255,0.6)',
