@@ -62,8 +62,10 @@ export const AccessProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   useEffect(() => {
     refreshAccess();
+  // SECURITY: también escuchar cambio de usuario (userId) como doble protección
+  // por si isAuthenticated no cambia al hacer login sobre sesión activa.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [auth?.isAuthenticated]);
+  }, [auth?.isAuthenticated, auth?.userProfile?.userId]);
 
   /**
    * Permiso de alcance global (o superadmin).

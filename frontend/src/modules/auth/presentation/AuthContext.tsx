@@ -59,6 +59,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const login = async (username: string, password: string) => {
     setIsLoading(true);
     setError(null);
+    // SECURITY: Limpiar el estado anterior ANTES de iniciar el nuevo login.
+    // Esto garantiza que isAuthenticated pase por false→true incluso si ya había
+    // una sesión activa, forzando al useAccess a recargar el accessProfile del nuevo usuario.
+    setIsAuthenticated(false);
+    setUserProfile(null);
     try {
       await loginUseCase.ejecutar(username, password);
       const perfil = await obtenerPerfilUseCase.ejecutar();

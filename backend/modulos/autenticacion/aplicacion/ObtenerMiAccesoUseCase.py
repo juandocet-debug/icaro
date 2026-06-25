@@ -24,7 +24,9 @@ class ObtenerMiAccesoUseCase:
         except User.DoesNotExist:
             raise ValueError("Usuario no encontrado.")
 
-        es_super = bool(user.is_superuser or user.is_staff)
+        # SECURITY: solo is_superuser es superadministrador de la aplicación.
+        # is_staff únicamente da acceso al panel admin de Django, no a privilegios globales de Ícaro.
+        es_super = bool(user.is_superuser)
 
         if es_super:
             permisos = [

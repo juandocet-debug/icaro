@@ -60,7 +60,9 @@ class UsuariosListController(APIView):
     pagination_class = None
 
     def get(self, request):
-        if not (request.user.is_staff or request.user.is_superuser):
+        # SECURITY: solo is_superuser tiene privilegios globales en la app.
+        # is_staff solo permite el panel admin de Django.
+        if not request.user.is_superuser:
             try:
                 VerificarPermisoUseCase().ejecutar(request.user.id, 'usuarios.ver')
             except PermissionError as e:
@@ -123,7 +125,7 @@ class UsuarioDetailController(APIView):
             # usuarios.desactivar: aceptar cualquier alcance (global o proyecto)
             from modulos.roles.infraestructura.models import UsuarioRolModel
             puede = (
-                request.user.is_superuser or request.user.is_staff or
+                request.user.is_superuser or
                 UsuarioRolModel.objects.filter(
                     usuario=request.user,
                     activo=True,
@@ -175,6 +177,7 @@ class UsuarioDetailController(APIView):
             return Response({'ok': False, 'error': str(e)}, status=status_code)
 
     def put(self, request, user_id):
+        # SECURITY: solo superusuario real de la app puede hacer PUT
         if not request.user.is_superuser:
             return Response({'ok': False, 'error': 'No tienes permisos para realizar esta acción.'}, status=403)
 
@@ -191,6 +194,7 @@ class UsuarioDetailController(APIView):
             return Response({'ok': False, 'error': str(e)}, status=400)
 
     def delete(self, request, user_id):
+        # SECURITY: solo superusuario real de la app puede eliminar usuarios
         if not request.user.is_superuser:
             return Response({'ok': False, 'error': 'No tienes permisos para realizar esta acción.'}, status=403)
 
@@ -209,7 +213,8 @@ class UsuarioAsignacionesController(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, user_id):
-        if not (request.user.is_staff or request.user.is_superuser):
+        # SECURITY: solo superusuario puede ver asignaciones de otros usuarios
+        if not request.user.is_superuser:
             return Response({'ok': False, 'error': 'Acceso no autorizado.'}, status=403)
 
         try:
