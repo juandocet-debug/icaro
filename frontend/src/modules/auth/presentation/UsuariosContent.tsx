@@ -665,3 +665,24 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     backgroundColor: 'transparent',
+  } as any,
+  cardIconTxt: {
+    fontFamily: typography.fontFamily,
+    fontSize: 12,
+    fontWeight: '600',
+  } as any,
+  cardToggleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 20,
+    alignSelf: 'flex-start',
+  } as any,
+  cardToggleDanger:  { backgroundColor: 'rgba(239,68,68,0.08)' },
+  cardToggleSuccess: { backgroundColor: 'rgba(40,167,111,0.08)' },
+  cardActionBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0' } as any,
+  cardActionTxt: { fontFamily: typography.fontFamily, fontSize: 12, fontWeight: '600' } as any,
+});
+
