@@ -332,7 +332,7 @@ export const ProyectoDetailScreen: React.FC<Props> = ({ proyectoId }) => {
               isMobileView={true}
             />
           )}
-          <ProyectoMetasComponentes proyectoId={proyectoId} isAdmin={canEdit} />
+          <ProyectoMetasComponentes proyectoId={proyectoId} isAdmin={isAdmin} />
           {canVerEquipo && <ProyectoEquipo proyectoId={proyectoId} isAdmin={canManageEquipo} />}
         </View>
       ) : (
@@ -351,7 +351,7 @@ export const ProyectoDetailScreen: React.FC<Props> = ({ proyectoId }) => {
             )}
           </View>
           <View style={{ flex: 1, minWidth: 240, gap: spacing.lg }}>
-            <ProyectoMetasComponentes proyectoId={proyectoId} isAdmin={canEdit} />
+            <ProyectoMetasComponentes proyectoId={proyectoId} isAdmin={isAdmin} />
             {showMisActividades && canVerEquipo && <ProyectoEquipo proyectoId={proyectoId} isAdmin={canManageEquipo} />}
           </View>
         </View>

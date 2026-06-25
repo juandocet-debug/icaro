@@ -95,9 +95,11 @@ export const ProyectoEquipo: React.FC<Props> = ({ proyectoId, isAdmin }) => {
         setRolId(rolesList[0].id);
       }
 
-      // Cargar componentes del proyecto
-      const compList = await listarComponentesProyectoUseCase.ejecutar(proyectoId);
-      setComponentes(compList);
+      // Cargar componentes del proyecto si es administrador
+      if (isAdmin) {
+        const compList = await listarComponentesProyectoUseCase.ejecutar(proyectoId);
+        setComponentes(compList);
+      }
     } catch {
       setError('No se pudo cargar el equipo o la configuración de roles.');
     } finally {

@@ -21,7 +21,7 @@ interface Props {
 }
 
 export const ProyectoMetasComponentes: React.FC<Props> = ({ proyectoId, isAdmin }) => {
-  const { accessProfile } = useAccess();
+  const { accessProfile, canInProject } = useAccess();
   const [metas, setMetas] = useState<Meta[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -32,21 +32,11 @@ export const ProyectoMetasComponentes: React.FC<Props> = ({ proyectoId, isAdmin 
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const isSuperAdmin = accessProfile?.esSuperadministrador === true;
 
-  /** Helper: comprueba si el usuario tiene alguno de los roles dados en este proyecto */
-  const tieneRolEnProyecto = (roles: string[]) =>
-    accessProfile?.asignaciones?.some(
-      (a) => a.proyectoId === proyectoId && roles.includes(a.rolCodigo)
-    ) ?? false;
+  /** Puede crear metas: Superadmin o permiso metas.crear en este proyecto */
+  const puedeCrearMeta = isSuperAdmin || canInProject('metas.crear', proyectoId);
 
-  /** Puede crear metas: Superadmin, Coord. Proyecto, Coord. General, Admin Proyecto */
-  const puedeCrearMeta = isSuperAdmin || tieneRolEnProyecto([
-    'administrador_proyecto', 'coordinador_proyecto', 'coordinador_general',
-  ]);
-
-  /** Puede editar metas: Superadmin, Coord. Proyecto, Coord. General, Admin Proyecto */
-  const puedeEditarMeta = isSuperAdmin || tieneRolEnProyecto([
-    'administrador_proyecto', 'coordinador_proyecto', 'coordinador_general',
-  ]);
+  /** Puede editar metas: Superadmin o permiso metas.editar en este proyecto */
+  const puedeEditarMeta = isSuperAdmin || canInProject('metas.editar', proyectoId);
 
   /** Puede eliminar metas: solo Superadmin */
   const puedeEliminarMeta = isSuperAdmin;
