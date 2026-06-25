@@ -107,7 +107,9 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
       {isOpen && (
         <View style={styles.dropdown}>
           <View style={styles.searchBox}>
-            <Ionicons name="search" size={14} color={colors.textSecondary} style={styles.searchIcon} />
+            <View style={styles.searchIconWrapper}>
+              <Ionicons name="search-outline" size={13} color={colors.primary} />
+            </View>
             <TextInput
               style={styles.searchInput}
               placeholder="Buscar..."
@@ -117,6 +119,11 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
               onKeyPress={handleKeyPress}
               autoFocus
             />
+            {search.length > 0 && (
+              <TouchableOpacity onPress={() => setSearch('')} style={styles.clearBtn}>
+                <Ionicons name="close-circle" size={14} color={colors.textSecondary} />
+              </TouchableOpacity>
+            )}
           </View>
           
           <ScrollView style={styles.optionsScroll} nestedScrollEnabled>
@@ -233,10 +240,20 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
     paddingHorizontal: spacing.sm,
-    height: 36,
+    paddingVertical: 6,
+    backgroundColor: 'rgba(108,85,201,0.04)',
+    gap: 6,
+  } as any,
+  searchIconWrapper: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    backgroundColor: 'rgba(108,85,201,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  searchIcon: {
-    marginRight: 6,
+  clearBtn: {
+    padding: 2,
   },
   searchInput: {
     flex: 1,

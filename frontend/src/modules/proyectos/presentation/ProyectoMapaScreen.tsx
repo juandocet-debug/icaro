@@ -67,62 +67,70 @@ export const ProyectoMapaScreen: React.FC<Props> = ({ proyectoId }) => {
     setLoading(true);
     setError(null);
     try {
-      // 1. Fetch Metas
-      const metas = await metaRepo.listar(proyectoId);
-      
-      // 2. Fetch Components and Actions in parallel
-      const enrichedMetas: TreeMeta[] = await Promise.all(
-        metas.map(async (meta) => {
-          const comps = await metaRepo.listarComponentes(proyectoId, meta.id);
-          const enrichedComps: TreeComponente[] = await Promise.all(
-            comps.map(async (comp) => {
-              const accs = await metaRepo.listarAcciones(comp.id);
-              return { ...comp, acciones: accs, expanded: true };
-            })
-          );
-          return { ...meta, componentes: enrichedComps, expanded: true };
-        })
-      );
+      // 3 requests en paralelo: mapa completo + evidencias + miembros (~300ms total)
+      const [resMapa, resEv, resM] = await Promise.all([
+        api.get<{ ok: boolean; datos: any[] }>(`/api/proyectos/${proyectoId}/mapa/`),
+        api.get<{ ok: boolean; datos: any[] }>(
+          `/api/evidencias/proyecto/${proyectoId}/evidencias-operativas-general/`
+        ).catch(() => ({ data: { ok: false, datos: [] } })),
+        api.get<{ ok: boolean; datos: any[] }>(
+          `/api/miembros/proyecto/${proyectoId}/miembros/`
+        ).catch(() => ({ data: { ok: false, datos: [] } })),
+      ]);
 
-      setTreeData(enrichedMetas);
+      // Mapa: jerarquía completa en 1 response
+      if (resMapa.data.ok) {
+        const enrichedMetas: TreeMeta[] = (resMapa.data.datos || []).map((meta: any) => ({
+          id: meta.id,
+          nombre: meta.nombre,
+          descripcion: meta.descripcion,
+          activo: meta.activo,
+          proyecto_id: proyectoId,
+          proyectoId: proyectoId,
+          created_at: meta.created_at,
+          expanded: true,
+          componentes: (meta.componentes || []).map((comp: any) => ({
+            id: comp.id,
+            nombre: comp.name ?? comp.nombre,
+            descripcion: comp.descripcion,
+            meta_id: comp.meta_id,
+            display_order: comp.display_order,
+            expanded: true,
+            acciones: (comp.acciones || []).map((acc: any) => ({
+              id: acc.id,
+              nombre: acc.nombre ?? acc.name,
+              descripcion: acc.descripcion,
+              unidad_medida: acc.unidad_medida,
+              proyeccion_cuantitativa: acc.proyeccion,
+              ejecucion_acumulada: acc.ejecucion,
+              start_date: acc.start_date,
+              end_date: acc.end_date,
+              display_order: acc.display_order,
+            })),
+          })),
+        }));
+        setTreeData(enrichedMetas);
+      }
 
-      // 3. Fetch Evidences to count KPIs
-      const resEv = await api.get<{ ok: boolean; datos: any[] }>(
-        `/api/evidencias/proyecto/${proyectoId}/evidencias-operativas-general/`
-      );
+      // Evidencias KPIs
       if (resEv.data.ok) {
         const evs = resEv.data.datos || [];
-        const kpis = {
+        setEvidenciaKpis({
           aprobadas: evs.filter((e: any) => e.estado === 'aprobada').length,
           revision: evs.filter((e: any) => e.estado === 'revision').length,
           noAprobadas: evs.filter((e: any) => e.estado === 'no_aprobada' || e.estado === 'rechazada').length,
           total: evs.length,
-        };
-        setEvidenciaKpis(kpis);
+        });
       }
 
-      // 4. Fetch Members to count collaborators
-      const resM = await api.get<{ ok: boolean; datos: any[] }>(
-        `/api/miembros/proyecto/${proyectoId}/miembros/`
-      );
+      // Colaboradores
       if (resM.data.ok) {
-        setColaboradoresCount(resM.data.datos ? resM.data.datos.length : 0);
-      } else {
-        // Fallback to checking the length if the endpoint format varies
-        const resMF = await api.get<any>(`/api/proyectos/${proyectoId}/miembros/`);
-        const membersList = Array.isArray(resMF.data) ? resMF.data : (resMF.data?.datos || []);
-        setColaboradoresCount(membersList.length);
+        setColaboradoresCount((resM.data.datos || []).length);
       }
+
     } catch (err) {
       console.error(err);
-      // Fallback count check
-      try {
-        const resMF = await api.get<any>(`/api/proyectos/${proyectoId}/miembros/`);
-        const membersList = Array.isArray(resMF.data) ? resMF.data : (resMF.data?.datos || []);
-        setColaboradoresCount(membersList.length);
-      } catch {
-        setColaboradoresCount(0);
-      }
+      setError('No se pudo cargar el mapa del proyecto.');
     } finally {
       setLoading(false);
     }

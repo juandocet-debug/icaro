@@ -13,6 +13,8 @@ from modulos.proyectos.infraestructura.models import ProyectoModel
 from modulos.roles.aplicacion.VerificarPermisoUseCase import VerificarPermisoUseCase
 from .DjangoMetaRepository import DjangoMetaRepository
 from .models import MetaModel
+from modulos.componentes.infraestructura.models import ComponenteModel
+from modulos.acciones.infraestructura.models import AccionModel
 
 
 def _s(meta):
@@ -195,3 +197,73 @@ class MetaArchivarController(APIView):
             return Response({'ok': False, 'error': str(exc)}, status=400)
         except PermissionError as exc:
             return Response({'ok': False, 'error': str(exc)}, status=403)
+
+
+class MapaProyectoController(APIView):
+    """
+    Endpoint optimizado: devuelve la jerarquía completa metas → componentes → acciones
+    en exactamente 3 queries usando prefetch_related.
+
+    Reemplaza el waterfall de N*M requests del frontend (1 req/componente + 1 req/accion)
+    por 1 sola llamada con toda la data anidada.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, proyecto_id):
+        try:
+            _project_access(proyecto_id, request.user, 'metas.ver')
+        except ValueError as exc:
+            status_code = 404 if 'no encontrado' in str(exc).lower() else 403
+            return Response({'ok': False, 'error': str(exc)}, status=status_code)
+        except PermissionError as exc:
+            return Response({'ok': False, 'error': str(exc)}, status=403)
+
+        # Query 1: metas activas del proyecto
+        # Query 2: todos los componentes de esas metas (prefetch)
+        # Query 3: todas las acciones de esos componentes (prefetch anidado)
+        metas_qs = (
+            MetaModel.objects
+            .filter(proyecto_id=proyecto_id, activo=True)
+            .prefetch_related(
+                'componentes',
+                'componentes__acciones',
+            )
+            .order_by('created_at')
+        )
+
+        resultado = []
+        for meta in metas_qs:
+            componentes_data = []
+            for comp in meta.componentes.all():
+                acciones_data = [
+                    {
+                        'id': str(acc.id),
+                        'nombre': acc.name,
+                        'descripcion': acc.description,
+                        'unidad_medida': acc.unidad_medida,
+                        'proyeccion': float(acc.proyeccion_cuantitativa) if acc.proyeccion_cuantitativa is not None else None,
+                        'ejecucion': float(acc.ejecucion_acumulada),
+                        'start_date': acc.start_date.isoformat() if acc.start_date else None,
+                        'end_date': acc.end_date.isoformat() if acc.end_date else None,
+                        'display_order': acc.display_order,
+                    }
+                    for acc in comp.acciones.all()
+                ]
+                componentes_data.append({
+                    'id': str(comp.id),
+                    'nombre': comp.name,
+                    'descripcion': comp.description,
+                    'meta_id': str(comp.meta_id),
+                    'display_order': comp.display_order,
+                    'acciones': acciones_data,
+                })
+            resultado.append({
+                'id': str(meta.id),
+                'nombre': meta.nombre,
+                'descripcion': meta.descripcion,
+                'activo': meta.activo,
+                'created_at': meta.created_at.isoformat() if meta.created_at else None,
+                'componentes': componentes_data,
+            })
+
+        return Response({'ok': True, 'datos': resultado}, status=200)
