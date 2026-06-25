@@ -387,45 +387,44 @@ export const UsuariosContent: React.FC<UsuariosContentProps> = ({ showForm, setS
                 )}
               </View>
 
-              {/* Acciones */}
+              {/* Acciones: todos inline, solo iconos */}
               <View style={styles.userCardActions}>
-                {/* Fila de iconos: Editar + Eliminar */}
-                {isSuperAdmin && (
-                  <View style={styles.cardActionsRow}>
+                <View style={styles.cardActionsRow}>
+                  {isSuperAdmin && (
                     <TouchableOpacity
                       style={[styles.cardIconBtn, { borderColor: colors.primary }]}
                       onPress={() => setEditingUser(u)}
+                      accessibilityLabel="Editar usuario"
                     >
-                      <Ionicons name="create-outline" size={15} color={colors.primary} />
-                      <Text style={[styles.cardIconTxt, { color: colors.primary }]}>Editar</Text>
+                      <Ionicons name="create-outline" size={16} color={colors.primary} />
                     </TouchableOpacity>
-                    {!u.isSuperuser && u.id !== userProfile?.userId && (
-                      <TouchableOpacity
-                        style={[styles.cardIconBtn, { borderColor: colors.error }]}
-                        onPress={() => setDeletingUser(u)}
-                      >
-                        <Ionicons name="trash-outline" size={15} color={colors.error} />
-                        <Text style={[styles.cardIconTxt, { color: colors.error }]}>Eliminar</Text>
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                )}
-                {/* Toggle Activar / Desactivar */}
-                {canDesactivar && u.id !== userProfile?.userId && (!u.isSuperuser || isSuperAdmin) && (
-                  <TouchableOpacity
-                    style={[styles.cardToggleBtn, u.isActive ? styles.cardToggleDanger : styles.cardToggleSuccess]}
-                    onPress={() => toggleActivo(u)}
-                  >
-                    <Ionicons
-                      name={u.isActive ? 'pause-circle-outline' : 'play-circle-outline'}
-                      size={15}
-                      color={u.isActive ? colors.error : colors.success}
-                    />
-                    <Text style={[styles.cardIconTxt, { color: u.isActive ? colors.error : colors.success }]}>
-                      {u.isActive ? 'Desactivar' : 'Activar'}
-                    </Text>
-                  </TouchableOpacity>
-                )}
+                  )}
+                  {isSuperAdmin && !u.isSuperuser && u.id !== userProfile?.userId && (
+                    <TouchableOpacity
+                      style={[styles.cardIconBtn, { borderColor: colors.error }]}
+                      onPress={() => setDeletingUser(u)}
+                      accessibilityLabel="Eliminar usuario"
+                    >
+                      <Ionicons name="trash-outline" size={16} color={colors.error} />
+                    </TouchableOpacity>
+                  )}
+                  {canDesactivar && u.id !== userProfile?.userId && (!u.isSuperuser || isSuperAdmin) && (
+                    <TouchableOpacity
+                      style={[
+                        styles.cardIconBtn,
+                        { borderColor: u.isActive ? colors.error : colors.success },
+                      ]}
+                      onPress={() => toggleActivo(u)}
+                      accessibilityLabel={u.isActive ? 'Desactivar' : 'Activar'}
+                    >
+                      <Ionicons
+                        name={u.isActive ? 'pause-circle-outline' : 'play-circle-outline'}
+                        size={16}
+                        color={u.isActive ? colors.error : colors.success}
+                      />
+                    </TouchableOpacity>
+                  )}
+                </View>
               </View>
             </View>
           ))}

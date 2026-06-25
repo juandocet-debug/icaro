@@ -314,13 +314,13 @@ export const ProyectoDetailScreen: React.FC<Props> = ({ proyectoId }) => {
           <View style={{ gap: spacing.lg }}>
             <ProyectoMetasComponentes proyectoId={proyectoId} isAdmin={canEdit} />
             {canVerEquipo && <ProyectoEquipo proyectoId={proyectoId} isAdmin={canEdit} />}
-            <ProyectoTiposDocumento proyectoId={proyectoId} isAdmin={canEdit} />
+            {/* <ProyectoTiposDocumento proyectoId={proyectoId} isAdmin={canEdit} /> -- proximamente */}
           </View>
         ) : (
           <View style={{ flexDirection: 'row', gap: spacing.lg, alignItems: 'flex-start', width: '100%' }}>
             <View style={{ flex: 1.6, gap: spacing.lg }}>
               {canVerEquipo && <ProyectoEquipo proyectoId={proyectoId} isAdmin={canEdit} />}
-              <ProyectoTiposDocumento proyectoId={proyectoId} isAdmin={canEdit} />
+              {/* <ProyectoTiposDocumento proyectoId={proyectoId} isAdmin={canEdit} /> -- proximamente */}
             </View>
             <View style={{ flex: 1, minWidth: 240, gap: spacing.lg }}>
               <ProyectoMetasComponentes proyectoId={proyectoId} isAdmin={canEdit} />

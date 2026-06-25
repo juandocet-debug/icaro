@@ -129,9 +129,7 @@ export const HomeScreen: React.FC = () => {
   }, [accessProfile, selectedProjectId]);
 
   const handleShortcutAction = () => {
-    if (puedeCrearProyecto) {
-      router.push('/proyectos?crear=true');
-    } else if (isGestorOfSelected) {
+    if (isGestorOfSelected) {
       router.push(`/proyectos/${selectedProjectId}`);
     } else {
       router.push('/mis-actividades');
@@ -139,9 +137,8 @@ export const HomeScreen: React.FC = () => {
   };
 
   const getShortcutLabel = () => {
-    if (puedeCrearProyecto) return 'Crear Proyecto';
-    if (isGestorOfSelected) return 'Agregar Componente';
-    return 'Agregar Evidencia';
+    if (isGestorOfSelected) return 'Ver Panel del Proyecto';
+    return 'Mis Actividades';
   };
 
   const selectedProjectName = proyectos.find(p => p.id === selectedProjectId)?.name ?? 'Seleccione Proyecto';
@@ -152,7 +149,29 @@ export const HomeScreen: React.FC = () => {
       <View style={isSplit ? styles.leftColumn : styles.fullWidth}>
         <WelcomeBanner username={userProfile?.username ?? 'Usuario'} />
 
-        {/* Selector de Proyecto */}
+        {/* Barra de perfil/logout — solo en móvil */}
+        {!isSplit && (
+          <View style={styles.mobileTopBar}>
+            <TouchableOpacity onPress={() => setShowProfileModal(true)} style={styles.mobileProfileBtn}>
+              {userProfile?.photoUrl ? (
+                <Image source={{ uri: userProfile.photoUrl }} style={styles.mobileAvatar} />
+              ) : (
+                <View style={styles.mobileAvatarFallback}>
+                  <Text style={styles.mobileAvatarInitial}>
+                    {(userProfile?.username ?? 'U').charAt(0).toUpperCase()}
+                  </Text>
+                </View>
+              )}
+              <Text style={styles.mobileProfileName} numberOfLines={1}>
+                {userProfile?.username ?? 'Mi Perfil'}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={handleLogout} style={styles.mobileLogoutBtn} accessibilityLabel="Cerrar sesión">
+              <Ionicons name="log-out-outline" size={20} color={colors.error} />
+            </TouchableOpacity>
+          </View>
+        )}
+
         {proyectos.length > 1 && (
           <View style={styles.selectorContainer}>
             <Text style={styles.selectorLabel}>Proyecto Activo:</Text>
@@ -673,4 +692,54 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     width: '100%',
   },
+  mobileTopBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    marginBottom: spacing.sm,
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  } as any,
+  mobileProfileBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+  } as any,
+  mobileAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+  },
+  mobileAvatarFallback: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mobileAvatarInitial: {
+    fontFamily: typography.fontFamily,
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  mobileProfileName: {
+    fontFamily: typography.fontFamily,
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.textPrimary,
+    flex: 1,
+  },
+  mobileLogoutBtn: {
+    padding: 6,
+    borderRadius: 8,
+    backgroundColor: 'rgba(239,68,68,0.08)',
+  },
 });
+

@@ -370,7 +370,7 @@ export const ProyectoEquipo: React.FC<Props> = ({ proyectoId, isAdmin }) => {
                   {m.photoUrl ? (
                     <Image
                       source={{ uri: m.photoUrl }}
-                      style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+                      style={{ width: '100%', height: '100%' } as any}
                       resizeMode="cover"
                     />
                   ) : (
