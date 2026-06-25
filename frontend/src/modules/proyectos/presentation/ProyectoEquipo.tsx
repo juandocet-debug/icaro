@@ -1,7 +1,13 @@
-import React, { useEffect, useState, useMemo } from 'react';
+/**
+ * ProyectoEquipo
+ * Muestra la grilla de miembros del proyecto y el formulario de asignación de roles.
+ * La lógica está en hooks/useProyectoEquipo.ts
+ * El modal de detalle está en components/MemberDetailModal.tsx
+ */
+import React from 'react';
 import {
   View, Text, StyleSheet, ActivityIndicator, Image,
-  TouchableOpacity, Modal, ScrollView, Platform,
+  TouchableOpacity, Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Card } from '../../../shared/components/Card';
@@ -10,460 +16,40 @@ import { ErrorMessage } from '../../../shared/components/ErrorMessage';
 import { colors } from '../../../shared/constants/colors';
 import { spacing } from '../../../shared/constants/spacing';
 import { typography } from '../../../shared/constants/typography';
-import { SearchableSelect, SelectOption } from '../../../shared/components/SearchableSelect';
+import { SearchableSelect } from '../../../shared/components/SearchableSelect';
 import { ProyectoMiembro } from '../domain/ProyectoMiembro';
-import { Meta } from '../domain/Meta';
-import { Rol } from '../../seguridad/domain/Rol';
-import { ComponentOption, ActionOption } from '../domain/ProyectoMiembroRepositoryPort';
-import {
-  listarRolesActivosUseCase,
-  listarComponentesProyectoUseCase,
-  listarAccionesComponenteUseCase,
-  asignarRolMiembroUseCase,
-  actualizarAsignacionRolUseCase,
-  retirarRolUseCase,
-  quitarAsignacionUseCase,
-  listarMiembrosUseCase,
-  listarUsuariosUseCase,
-  listarMetasProyectoUseCase,
-} from '../../../shared/dependencies';
-import { MemberRole } from '../domain/ProyectoMiembro';
-
-// ── Caché de sesión para datos globales (roles/usuarios) ─────────────────────
-// Se cargan una sola vez por sesión y no se re-piden entre proyectos
-const SESSION_CACHE: {
-  roles: Rol[] | null;
-  usuarios: any[] | null;
-} = { roles: null, usuarios: null };
+import { MemberDetailModal } from './components/MemberDetailModal';
+import { useProyectoEquipo } from './hooks/useProyectoEquipo';
 
 const AVATAR_COLORS = [colors.primary, colors.success, colors.accent, colors.primaryDark];
 
-// ── Modal detalle de miembro ────────────────────────────────────────────────
-interface MemberDetailModalProps {
-  visible: boolean;
-  miembro: ProyectoMiembro | null;
-  componentes: ComponentOption[];
-  isAdmin: boolean;
-  onClose: () => void;
-  onEditRole: (m: ProyectoMiembro, r: MemberRole) => void;
-  onRetirarRol: (asignacionId: string, rolNombre: string, nombre: string) => void;
-  onRetirarDelProyecto: (miembroId: string, nombre: string) => void;
-}
-
-const MemberDetailModal: React.FC<MemberDetailModalProps> = ({
-  visible, miembro, componentes, isAdmin,
-  onClose, onEditRole, onRetirarRol, onRetirarDelProyecto,
-}) => {
-  if (!miembro) return null;
-  const nombre = miembro.nombreCompleto || miembro.username;
-  const inicial = nombre.charAt(0).toUpperCase();
-  const colorIdx = 0;
-
-  const getScopeTexto = (r: MemberRole) => {
-    if (r.rolNombre === 'Superadministrador') return 'Alcance Global';
-    if (r.accionId) return `Acción específica`;
-    if (r.componenteId) {
-      const comp = componentes.find((c) => c.id === r.componenteId);
-      return `Componente: ${comp?.name || r.componenteId}`;
-    }
-    return 'Proyecto completo';
-  };
-
-  const roles = miembro.roles ?? [];
-
-  return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={md.overlay}>
-        <View style={md.card}>
-          {/* Header */}
-          <View style={md.header}>
-            <View style={[md.avatar, { backgroundColor: AVATAR_COLORS[colorIdx] }]}>
-              {miembro.photoUrl ? (
-                <Image source={{ uri: miembro.photoUrl }} style={md.avatarImg as any} resizeMode="cover" />
-              ) : (
-                <Text style={md.inicial}>{inicial}</Text>
-              )}
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={md.nombre} numberOfLines={1}>{nombre}</Text>
-              <Text style={md.username}>@{miembro.username}</Text>
-            </View>
-            <TouchableOpacity onPress={onClose} style={md.closeBtn} accessibilityLabel="Cerrar">
-              <Ionicons name="close" size={20} color={colors.textSecondary} />
-            </TouchableOpacity>
-          </View>
-
-          {/* Divider */}
-          <View style={md.divider} />
-
-          {/* Roles */}
-          <Text style={md.seccionTitulo}>
-            {roles.length === 1 ? '1 Rol asignado' : `${roles.length} Roles asignados`}
-          </Text>
-
-          <ScrollView style={md.rolesScroll} showsVerticalScrollIndicator={false}>
-            {roles.length === 0 ? (
-              <Text style={md.vacio}>Sin roles asignados.</Text>
-            ) : (
-              roles.map((r, idx) => (
-                <View key={r.id || idx} style={md.rolRow}>
-                  <View style={md.rolIconWrap}>
-                    <Ionicons name="shield-checkmark-outline" size={16} color={colors.primary} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={md.rolNombre}>{r.rolNombre}</Text>
-                    <Text style={md.rolAlcance}>{getScopeTexto(r)}</Text>
-                  </View>
-                  {isAdmin && r.id && (
-                    <View style={md.rolActions}>
-                      <TouchableOpacity
-                        onPress={() => { onClose(); onEditRole(miembro, r); }}
-                        style={md.rolActionBtn}
-                        accessibilityLabel="Editar rol"
-                      >
-                        <Ionicons name="pencil-outline" size={15} color={colors.primary} />
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        onPress={() => { onClose(); onRetirarRol(r.id, r.rolNombre, nombre); }}
-                        style={md.rolActionBtn}
-                        accessibilityLabel="Retirar rol"
-                      >
-                        <Ionicons name="close-circle-outline" size={15} color={colors.error} />
-                      </TouchableOpacity>
-                    </View>
-                  )}
-                </View>
-              ))
-            )}
-          </ScrollView>
-
-          {/* Footer */}
-          {isAdmin && (
-            <View style={md.footer}>
-              <TouchableOpacity
-                style={md.retirarBtn}
-                onPress={() => { onClose(); onRetirarDelProyecto(miembro.id, nombre); }}
-              >
-                <Ionicons name="person-remove-outline" size={14} color={colors.error} />
-                <Text style={md.retirarTxt}>Retirar del Proyecto</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-        </View>
-      </View>
-    </Modal>
-  );
-};
-
-// ── Componente principal ────────────────────────────────────────────────────
 interface Props {
   proyectoId: string;
   isAdmin: boolean;
-  /** Data pre-cargada por el padre: elimina el spinner en el primer render */
   initialMiembros?: any[] | null;
 }
 
 export const ProyectoEquipo: React.FC<Props> = ({ proyectoId, isAdmin, initialMiembros }) => {
-  // Si el padre pre-cargó los miembros, arrancamos sin spinner
-  const [miembros, setMiembros] = useState<ProyectoMiembro[]>((initialMiembros as any) ?? []);
-  const [roles, setRoles] = useState<Rol[]>([]);
-  const [metas, setMetas] = useState<Meta[]>([]);
-  const [componentes, setComponentes] = useState<ComponentOption[]>([]);
-  const [acciones, setAcciones] = useState<ActionOption[]>([]);
-  const [usuariosOpts, setUsuariosOpts] = useState<SelectOption[]>([]);
+  const {
+    miembros, loading, refreshing, error,
+    showForm, setShowForm, formErr, saving, editingAsignacionId,
+    username, setUsername, rolId, setRolId,
+    selectedMetaId, setSelectedMetaId, selectedCompId, setSelectedCompId,
+    selectedAccId, setSelectedAccId,
+    confirm, setConfirm, miembroDetalle, setMiembroDetalle,
+    rolesOptions, metasOptions, componentesOptions, accionesOptions, usuariosOpts,
+    requiereComponente, requiereAccion, canSubmit, componentes,
+    cargarDatosFormulario, resetForm, getRolResumen,
+    handleAgregarOrEditar, handleEditClick, handleEliminar, handleRetirarRol,
+  } = useProyectoEquipo({ proyectoId, isAdmin, initialMiembros });
 
-  // Si initialMiembros fue provisto, no mostramos spinner global
-  const [loading, setLoading] = useState(initialMiembros == null);
-  const [formDataLoaded, setFormDataLoaded] = useState(false);
-  // `refreshing` es true solo al recargar miembros post-mutación → no borra la UI
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const [showForm, setShowForm] = useState(false);
-  const [username, setUsername] = useState('');
-  const [rolId, setRolId] = useState('');
-  const [selectedMetaId, setSelectedMetaId] = useState<string>('');
-  const [selectedCompId, setSelectedCompId] = useState<string>('');
-  const [selectedAccId, setSelectedAccId] = useState<string>('');
-
-  const [saving, setSaving] = useState(false);
-  const [formErr, setFormErr] = useState<string | null>(null);
-
-  const [editingAsignacionId, setEditingAsignacionId] = useState<string | null>(null);
-
-  // Modal confirmación genérico
-  const [confirm, setConfirm] = useState<{
-    titulo: string;
-    mensaje: string;
-    onOk: () => void;
-  } | null>(null);
-
-  // Modal detalle miembro
-  const [miembroDetalle, setMiembroDetalle] = useState<ProyectoMiembro | null>(null);
-
-  // ── Solo recarga la lista de miembros (post-mutación, sin spinner completo) ──
-  const refrescarMiembros = async () => {
-    setRefreshing(true);
-    try {
-      const lista = await listarMiembrosUseCase.ejecutar(proyectoId);
-      setMiembros(lista);
-    } catch (err) {
-      console.error('Error al refrescar miembros', err);
-    } finally {
-      setRefreshing(false);
-    }
-  };
-
-  // ── Carga inicial: solo miembros si initialMiembros no fue provisto ─────────
-  const cargar = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const miembrosList = await listarMiembrosUseCase.ejecutar(proyectoId);
-      setMiembros(miembrosList);
-    } catch (err) {
-      console.error('Error al cargar equipo', err);
-      setError('No se pudo cargar el equipo del proyecto.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // ── Carga lazy del formulario (solo cuando el admin abre el form) ──────────
-  const cargarDatosFormulario = async () => {
-    if (formDataLoaded) return; // ya cargado, no re-fetch
-    try {
-      // Roles y usuarios: usar caché de sesión si disponible
-      const [rolesList, todosUsuarios, compList, metasList] = await Promise.all([
-        SESSION_CACHE.roles
-          ? Promise.resolve(SESSION_CACHE.roles)
-          : listarRolesActivosUseCase.ejecutar().catch(() => [] as Rol[]),
-        SESSION_CACHE.usuarios
-          ? Promise.resolve(SESSION_CACHE.usuarios)
-          : listarUsuariosUseCase.ejecutar().catch(() => []),
-        listarComponentesProyectoUseCase.ejecutar(proyectoId).catch(() => [] as ComponentOption[]),
-        listarMetasProyectoUseCase.ejecutar(proyectoId).catch(() => [] as Meta[]),
-      ]);
-
-      // Guardar en caché de sesión
-      if (!SESSION_CACHE.roles && rolesList.length > 0) SESSION_CACHE.roles = rolesList;
-      if (!SESSION_CACHE.usuarios && todosUsuarios.length > 0) SESSION_CACHE.usuarios = todosUsuarios;
-
-      if (rolesList.length > 0) {
-        setRoles(rolesList);
-        setRolId(rolesList[0].id);
-      }
-      setUsuariosOpts(
-        todosUsuarios
-          .filter((u: any) => u.isActive)
-          .map((u: any) => ({
-            id: u.username,
-            name: u.nombreCompleto || u.username,
-            description: u.username,
-            photoUrl: u.photoUrl,
-          }))
-      );
-      setComponentes(compList);
-      setMetas(metasList.filter((m: Meta) => m.activo));
-      setFormDataLoaded(true);
-    } catch (err) {
-      console.error('Error al cargar datos del formulario', err);
-    }
-  };
-
-  // Cargar miembros solo si el padre NO los pre-cargó
-  useEffect(() => {
-    if (initialMiembros != null) {
-      // Ya tenemos la data del padre
-      setMiembros(initialMiembros as any);
-      setLoading(false);
-    } else {
-      cargar();
-    }
-  }, [proyectoId]);
-
-  // ── Cargar acciones cuando se selecciona componente ────────────────────────
-  useEffect(() => {
-    const cargarAcciones = async () => {
-      if (!selectedCompId) { setAcciones([]); setSelectedAccId(''); return; }
-      try {
-        const accList = await listarAccionesComponenteUseCase.ejecutar(selectedCompId);
-        setAcciones(accList);
-      } catch (err) {
-        console.error('Error al cargar acciones del componente', err);
-      }
-    };
-    cargarAcciones();
-  }, [selectedCompId]);
-
-  const selectedRol = useMemo(() => roles.find((r) => r.id === rolId), [roles, rolId]);
-
-  // Al cambiar rol, resetear selecciones de alcance
-  useEffect(() => {
-    if (selectedRol) {
-      if (selectedRol.tipo_alcance !== 'componente' && selectedRol.tipo_alcance !== 'accion') {
-        setSelectedMetaId('');
-        setSelectedCompId('');
-      }
-      if (selectedRol.tipo_alcance !== 'accion') {
-        setSelectedAccId('');
-      }
-    }
-  }, [rolId, selectedRol]);
-
-  // Al cambiar meta, limpiar componente
-  useEffect(() => {
-    setSelectedCompId('');
-  }, [selectedMetaId]);
-
-  const requiereComponente = selectedRol?.tipo_alcance === 'componente' || selectedRol?.tipo_alcance === 'accion';
-  const requiereAccion = selectedRol?.tipo_alcance === 'accion';
-
-  // ── Opciones derivadas ─────────────────────────────────────────────────────
-  const rolesOptions = useMemo(() =>
-    roles.map((r) => ({
-      id: r.id,
-      name: r.nombre,
-      description: r.descripcion,
-      category: r.es_sistema ? 'ROLES DEL SISTEMA' : 'ROLES PERSONALIZADOS',
-      badgeText: r.es_sistema ? 'Sistema' : 'Personalizado',
-    })), [roles]);
-
-  const metasOptions = useMemo(() =>
-    metas.map((m) => ({ id: m.id, name: m.nombre })), [metas]);
-
-  // Componentes filtrados por la meta seleccionada
-  const componentesOptions = useMemo(() => {
-    const lista = selectedMetaId
-      ? componentes.filter((c) => c.metaId === selectedMetaId)
-      : componentes;
-    return lista.map((c) => ({ id: c.id, name: c.name }));
-  }, [componentes, selectedMetaId]);
-
-  const accionesOptions = useMemo(() =>
-    acciones.map((a) => ({ id: a.id, name: a.name })), [acciones]);
-
-  const canSubmit = (editingAsignacionId || username.trim().length > 0) && rolId.length > 0;
-
-  // ── Guardar ────────────────────────────────────────────────────────────────
-  const ejecutarGuardar = async () => {
-    setSaving(true);
-    setFormErr(null);
-    try {
-      if (editingAsignacionId) {
-        await actualizarAsignacionRolUseCase.ejecutar(
-          proyectoId, editingAsignacionId, rolId,
-          requiereComponente ? selectedCompId : null,
-          requiereAccion ? selectedAccId : null
-        );
-      } else {
-        await asignarRolMiembroUseCase.ejecutar(
-          proyectoId, username.trim(), rolId,
-          requiereComponente ? selectedCompId : null,
-          requiereAccion ? selectedAccId : null
-        );
-      }
-      resetForm();
-      // Solo refresca miembros, sin full spinner
-      await refrescarMiembros();
-    } catch (e: any) {
-      setFormErr(e?.response?.data?.error ?? 'Error al guardar la asignación.');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const resetForm = () => {
-    setUsername(''); setRolId(''); setSelectedMetaId('');
-    setSelectedCompId(''); setSelectedAccId('');
-    setEditingAsignacionId(null); setShowForm(false); setFormErr(null);
-  };
-
-  const handleAgregarOrEditar = () => {
-    if (!editingAsignacionId && !username.trim()) { setFormErr('El username es obligatorio.'); return; }
-    if (!rolId) { setFormErr('Debe seleccionar un rol.'); return; }
-    if (requiereComponente && !selectedCompId) { setFormErr('Este rol requiere seleccionar un componente.'); return; }
-    if (requiereAccion && !selectedAccId) { setFormErr('Este rol requiere seleccionar una acción específica.'); return; }
-
-    if (editingAsignacionId) {
-      const rolNombre = roles.find((r) => r.id === rolId)?.nombre ?? 'rol seleccionado';
-      setConfirm({
-        titulo: 'Confirmar cambio de rol',
-        mensaje: `¿Confirmas cambiar el rol de ${username} a "${rolNombre}"?`,
-        onOk: ejecutarGuardar,
-      });
-    } else {
-      ejecutarGuardar();
-    }
-  };
-
-  const handleEditClick = (m: ProyectoMiembro, r: MemberRole) => {
-    setEditingAsignacionId(r.id);
-    setUsername(m.username);
-    setRolId(r.rolId);
-    // Recuperar metaId del componente si existe
-    if (r.componenteId) {
-      const comp = componentes.find((c) => c.id === r.componenteId);
-      setSelectedMetaId(comp?.metaId || '');
-    }
-    setSelectedCompId(r.componenteId || '');
-    setSelectedAccId(r.accionId || '');
-    setShowForm(true);
-    setFormErr(null);
-  };
-
-  const handleEliminar = (miembroId: string, nombreMiembro: string) => {
-    setConfirm({
-      titulo: 'Retirar del proyecto',
-      mensaje: `¿Confirmas retirar a ${nombreMiembro} del proyecto? Se eliminarán todas sus asignaciones de rol.`,
-      onOk: async () => {
-        // Optimista: quitar inmediatamente de la lista local, luego sincronizar
-        setMiembros((prev) => prev.filter((m) => m.id !== miembroId));
-        try {
-          await quitarAsignacionUseCase.ejecutar(proyectoId, miembroId);
-          await refrescarMiembros();
-        } catch {
-          setError('No se pudo eliminar el miembro.');
-          await refrescarMiembros(); // revertir
-        }
-      },
-    });
-  };
-
-  const handleRetirarRol = (asignacionId: string, rolNombre: string, nombreMiembro: string) => {
-    setConfirm({
-      titulo: 'Retirar rol',
-      mensaje: `¿Confirmas retirar el rol "${rolNombre}" a ${nombreMiembro}?`,
-      onOk: async () => {
-        try {
-          await retirarRolUseCase.ejecutar(proyectoId, asignacionId);
-          await refrescarMiembros();
-        } catch {
-          setError('No se pudo retirar el rol.');
-        }
-      },
-    });
-  };
-
-  // ── Texto resumen de roles para tarjeta ────────────────────────────────────
-  const getRolResumen = (m: ProyectoMiembro) => {
-    const roles = m.roles ?? [];
-    if (roles.length === 0) return { principal: 'Sin rol', extra: '' };
-    const principal = roles[0].rolNombre;
-    const extra = roles.length > 1 ? `+${roles.length - 1} más` : '';
-    return { principal, extra };
-  };
-
-  // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <Card padding="md" style={styles.card}>
-      {/* Header del panel */}
-      <View style={styles.header}>
+    <Card padding="md" style={s.card}>
+      {/* Header */}
+      <View style={s.header}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs } as any}>
-          <Text style={styles.titulo}>Equipo del Proyecto</Text>
-          {refreshing && (
-            <ActivityIndicator size="small" color={colors.primary} style={{ marginLeft: 6 }} />
-          )}
+          <Text style={s.titulo}>Equipo del Proyecto</Text>
+          {refreshing && <ActivityIndicator size="small" color={colors.primary} style={{ marginLeft: 6 }} />}
         </View>
         {isAdmin && (
           <Button
@@ -471,12 +57,8 @@ export const ProyectoEquipo: React.FC<Props> = ({ proyectoId, isAdmin, initialMi
             size="sm"
             variant={showForm ? 'ghost' : 'primary'}
             onPress={() => {
-              if (showForm) {
-                resetForm();
-              } else {
-                setShowForm(true);
-                cargarDatosFormulario(); // lazy: carga roles/usuarios/componentes solo si no están cargados
-              }
+              if (showForm) { resetForm(); }
+              else { setShowForm(true); cargarDatosFormulario(); }
             }}
           />
         )}
@@ -484,85 +66,46 @@ export const ProyectoEquipo: React.FC<Props> = ({ proyectoId, isAdmin, initialMi
 
       {/* Formulario de asignación */}
       {isAdmin && showForm && (
-        <View style={styles.formBox}>
+        <View style={s.formBox}>
           {!!formErr && <ErrorMessage message={formErr} />}
-          <View style={styles.formContent}>
-
-            {/* Usuario */}
+          <View style={s.formContent}>
             {!editingAsignacionId && (
-              <View style={styles.zIdx50}>
-                <Text style={styles.sublabel}>Seleccionar Usuario *</Text>
-                <SearchableSelect
-                  options={usuariosOpts}
-                  selectedValue={username}
-                  onSelect={setUsername}
-                  placeholder="Buscar por nombre o username..."
-                />
+              <View style={s.zIdx50}>
+                <Text style={s.sublabel}>Seleccionar Usuario *</Text>
+                <SearchableSelect options={usuariosOpts} selectedValue={username} onSelect={setUsername} placeholder="Buscar por nombre o username..." />
               </View>
             )}
-
-            {/* Rol */}
-            <View style={styles.zIdx40}>
-              <Text style={styles.sublabel}>Seleccionar Rol *</Text>
-              <SearchableSelect
-                options={rolesOptions}
-                selectedValue={rolId}
-                onSelect={setRolId}
-                placeholder="Buscar o seleccionar rol... 🔍"
-              />
+            <View style={s.zIdx40}>
+              <Text style={s.sublabel}>Seleccionar Rol *</Text>
+              <SearchableSelect options={rolesOptions} selectedValue={rolId} onSelect={setRolId} placeholder="Buscar o seleccionar rol... 🔍" />
             </View>
-
-            {/* Meta (solo cuando requiere componente) */}
             {requiereComponente && (
-              <View style={styles.zIdx30}>
-                <Text style={styles.sublabel}>Seleccionar Meta *</Text>
-                <SearchableSelect
-                  options={metasOptions}
-                  selectedValue={selectedMetaId}
-                  onSelect={setSelectedMetaId}
-                  placeholder="Elige la meta del proyecto..."
-                />
+              <View style={s.zIdx30}>
+                <Text style={s.sublabel}>Seleccionar Meta *</Text>
+                <SearchableSelect options={metasOptions} selectedValue={selectedMetaId} onSelect={setSelectedMetaId} placeholder="Elige la meta del proyecto..." />
               </View>
             )}
-
-            {/* Componente (filtrado por meta) */}
             {requiereComponente && selectedMetaId && (
-              <View style={styles.zIdx20}>
-                <Text style={styles.sublabel}>
-                  Seleccionar Componente *
-                  {componentesOptions.length === 0
-                    ? '  (esta meta no tiene componentes)'
-                    : ` (${componentesOptions.length} disponibles)`}
+              <View style={s.zIdx20}>
+                <Text style={s.sublabel}>
+                  {`Seleccionar Componente *${componentesOptions.length === 0 ? '  (sin componentes)' : ` (${componentesOptions.length})`}`}
                 </Text>
-                <SearchableSelect
-                  options={componentesOptions}
-                  selectedValue={selectedCompId}
-                  onSelect={setSelectedCompId}
-                  placeholder="Buscar o seleccionar componente..."
-                />
+                <SearchableSelect options={componentesOptions} selectedValue={selectedCompId} onSelect={setSelectedCompId} placeholder="Buscar o seleccionar componente..." />
               </View>
             )}
-
-            {/* Acción */}
-            {requiereAccion && selectedCompId ? (
-              <View style={styles.zIdx10}>
-                <Text style={styles.sublabel}>Seleccionar Acción *</Text>
-                <SearchableSelect
-                  options={accionesOptions}
-                  selectedValue={selectedAccId}
-                  onSelect={setSelectedAccId}
-                  placeholder="Buscar o seleccionar acción..."
-                />
+            {requiereAccion && selectedCompId && (
+              <View style={s.zIdx10}>
+                <Text style={s.sublabel}>Seleccionar Acción *</Text>
+                <SearchableSelect options={accionesOptions} selectedValue={selectedAccId} onSelect={setSelectedAccId} placeholder="Buscar o seleccionar acción..." />
               </View>
-            ) : null}
-
+            )}
             <Button
               label={editingAsignacionId ? 'Guardar Cambios' : 'Agregar Miembro'}
               onPress={handleAgregarOrEditar}
               loading={saving}
               disabled={!canSubmit}
               size="sm"
-              style={[styles.btnGuardar, !canSubmit && styles.btnDisabled]}
+              style={[s.btnGuardar, !canSubmit && s.btnDisabled]}
             />
           </View>
         </View>
@@ -574,51 +117,37 @@ export const ProyectoEquipo: React.FC<Props> = ({ proyectoId, isAdmin, initialMi
       {loading ? (
         <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: spacing.md }} />
       ) : miembros.length === 0 ? (
-        <Text style={styles.vacio}>Sin miembros asignados aún.</Text>
+        <Text style={s.vacio}>Sin miembros asignados aún.</Text>
       ) : (
-        <View style={styles.grid}>
+        <View style={s.grid}>
           {miembros.map((m, idx) => {
             const { principal, extra } = getRolResumen(m);
             const totalRoles = (m.roles ?? []).length;
             return (
               <TouchableOpacity
                 key={m.id}
-                style={styles.memberWrapper}
+                style={s.memberWrapper}
                 activeOpacity={0.85}
                 onPress={() => setMiembroDetalle(m)}
                 accessibilityLabel={`Ver detalles de ${m.nombreCompleto || m.username}`}
               >
-                {/* Foto / Inicial */}
-                <View style={[styles.memberCard, { backgroundColor: AVATAR_COLORS[idx % AVATAR_COLORS.length] }]}>
-                  {m.photoUrl ? (
-                    <Image
-                      source={{ uri: m.photoUrl }}
-                      style={{ width: '100%', height: '100%' } as any}
-                      resizeMode="cover"
-                    />
-                  ) : (
-                    <Text style={styles.inicial}>
-                      {(m.nombreCompleto || m.username).charAt(0).toUpperCase()}
-                    </Text>
-                  )}
-                  <View style={styles.overlay}>
-                    <Text style={styles.nombre} numberOfLines={1}>
-                      {m.nombreCompleto || m.username}
-                    </Text>
+                <View style={[s.memberCard, { backgroundColor: AVATAR_COLORS[idx % AVATAR_COLORS.length] }]}>
+                  {m.photoUrl
+                    ? <Image source={{ uri: m.photoUrl }} style={{ width: '100%', height: '100%' } as any} resizeMode="cover" />
+                    : <Text style={s.inicial}>{(m.nombreCompleto || m.username).charAt(0).toUpperCase()}</Text>
+                  }
+                  <View style={s.overlay}>
+                    <Text style={s.nombre} numberOfLines={1}>{m.nombreCompleto || m.username}</Text>
                   </View>
                 </View>
-
-                {/* Rol principal + badge extra */}
-                <View style={styles.rolChip}>
-                  <Text style={styles.rolChipText} numberOfLines={1}>{principal}</Text>
-                  {!!extra && <Text style={styles.rolChipExtra}>{extra}</Text>}
+                <View style={s.rolChip}>
+                  <Text style={s.rolChipText} numberOfLines={1}>{principal}</Text>
+                  {!!extra && <Text style={s.rolChipExtra}>{extra}</Text>}
                 </View>
-
-                {/* Indicador de roles */}
                 {totalRoles > 0 && (
-                  <View style={styles.verDetalle}>
+                  <View style={s.verDetalle}>
                     <Ionicons name="information-circle-outline" size={11} color={colors.primary} />
-                    <Text style={styles.verDetalleTxt}>Ver roles</Text>
+                    <Text style={s.verDetalleTxt}>Ver roles</Text>
                   </View>
                 )}
               </TouchableOpacity>
@@ -627,7 +156,7 @@ export const ProyectoEquipo: React.FC<Props> = ({ proyectoId, isAdmin, initialMi
         </View>
       )}
 
-      {/* ── Modal detalle de miembro ── */}
+      {/* Modal detalle de miembro */}
       <MemberDetailModal
         visible={!!miembroDetalle}
         miembro={miembroDetalle}
@@ -639,20 +168,16 @@ export const ProyectoEquipo: React.FC<Props> = ({ proyectoId, isAdmin, initialMi
         onRetirarDelProyecto={(id, nombre) => { setMiembroDetalle(null); handleEliminar(id, nombre); }}
       />
 
-      {/* ── Modal de confirmación genérico ── */}
+      {/* Modal de confirmación genérico */}
       {!!confirm && (
         <Modal visible={!!confirm} transparent animationType="fade" onRequestClose={() => setConfirm(null)}>
-          <View style={styles.confirmOverlay}>
-            <View style={styles.confirmCard}>
-              <Text style={styles.confirmTitulo}>{confirm?.titulo}</Text>
-              <Text style={styles.confirmMensaje}>{confirm?.mensaje}</Text>
-              <View style={styles.confirmBtns}>
+          <View style={s.confirmOverlay}>
+            <View style={s.confirmCard}>
+              <Text style={s.confirmTitulo}>{confirm?.titulo}</Text>
+              <Text style={s.confirmMensaje}>{confirm?.mensaje}</Text>
+              <View style={s.confirmBtns}>
                 <Button label="Cancelar" variant="ghost" size="sm" onPress={() => setConfirm(null)} />
-                <Button
-                  label="✓  Confirmar"
-                  size="sm"
-                  onPress={() => { confirm?.onOk(); setConfirm(null); }}
-                />
+                <Button label="✓  Confirmar" size="sm" onPress={() => { confirm?.onOk(); setConfirm(null); }} />
               </View>
             </View>
           </View>
@@ -662,296 +187,36 @@ export const ProyectoEquipo: React.FC<Props> = ({ proyectoId, isAdmin, initialMi
   );
 };
 
-// ── Estilos panel principal ────────────────────────────────────────────────
-const styles = StyleSheet.create({
-  card: { marginBottom: spacing.md },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.md,
-  },
-  titulo: {
-    fontFamily: typography.fontFamily,
-    fontSize: typography.sizes.md,
-    fontWeight: typography.weights.bold,
-    color: colors.textPrimary,
-  },
-  formBox: {
-    marginBottom: spacing.md,
-    padding: spacing.md,
-    backgroundColor: colors.background,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-    zIndex: 60,
-    position: 'relative',
-  },
-  formContent: { gap: spacing.sm } as any,
-  sublabel: {
-    fontFamily: typography.fontFamily,
-    fontSize: 11,
-    fontWeight: typography.weights.bold,
-    color: colors.textSecondary,
-    textTransform: 'uppercase',
-    marginTop: spacing.xs,
-  },
+// ── Estilos ───────────────────────────────────────────────────────────────────
+const s = StyleSheet.create({
+  card:       { marginBottom: spacing.md },
+  header:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md },
+  titulo:     { fontFamily: typography.fontFamily, fontSize: typography.sizes.md, fontWeight: typography.weights.bold, color: colors.textPrimary },
+  formBox:    { marginBottom: spacing.md, padding: spacing.md, backgroundColor: colors.background, borderRadius: 12, borderWidth: 1, borderColor: colors.border, zIndex: 60, position: 'relative' },
+  formContent:{ gap: spacing.sm } as any,
+  sublabel:   { fontFamily: typography.fontFamily, fontSize: 11, fontWeight: typography.weights.bold, color: colors.textSecondary, textTransform: 'uppercase', marginTop: spacing.xs },
   btnGuardar: { marginTop: spacing.sm, backgroundColor: colors.primary },
-  btnDisabled: { opacity: 0.5 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md } as any,
+  btnDisabled:{ opacity: 0.5 },
+  grid:       { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md } as any,
   memberWrapper: { alignItems: 'center', width: 130, marginBottom: spacing.sm },
-  memberCard: {
-    width: 120, height: 120,
-    borderRadius: 16,
-    overflow: 'hidden' as any,
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-  },
-  inicial: {
-    fontFamily: typography.fontFamily,
-    fontSize: 36,
-    fontWeight: typography.weights.bold,
-    color: colors.surface,
-    opacity: 0.35,
-  },
-  overlay: {
-    position: 'absolute',
-    bottom: 0, left: 0, right: 0,
-    backgroundColor: `${colors.darkBg}B8`,
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.sm,
-  },
-  nombre: {
-    fontFamily: typography.fontFamily,
-    fontSize: 10,
-    fontWeight: typography.weights.bold,
-    color: colors.surface,
-    textAlign: 'center',
-  } as any,
-  rolChip: {
-    marginTop: 6,
-    backgroundColor: `${colors.primary}14`,
-    borderColor: `${colors.primary}30`,
-    borderWidth: 1,
-    borderRadius: 20,
-    paddingVertical: 3,
-    paddingHorizontal: 8,
-    alignItems: 'center',
-    width: '100%',
-  },
-  rolChipText: {
-    fontFamily: typography.fontFamily,
-    fontSize: 9,
-    fontWeight: typography.weights.bold,
-    color: colors.primary,
-    textAlign: 'center',
-  },
-  rolChipExtra: {
-    fontFamily: typography.fontFamily,
-    fontSize: 8,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    marginTop: 1,
-  },
-  verDetalle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-    marginTop: 4,
-  } as any,
-  verDetalleTxt: {
-    fontFamily: typography.fontFamily,
-    fontSize: 9,
-    color: colors.primary,
-  },
-  vacio: {
-    fontFamily: typography.fontFamily,
-    fontSize: typography.sizes.sm,
-    color: colors.textSecondary,
-    fontStyle: 'italic',
-  },
-  zIdx50: { zIndex: 50, position: 'relative' } as any,
-  zIdx40: { zIndex: 40, position: 'relative' } as any,
-  zIdx30: { zIndex: 30, position: 'relative' } as any,
-  zIdx20: { zIndex: 20, position: 'relative' } as any,
-  zIdx10: { zIndex: 10, position: 'relative' } as any,
-  confirmOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  confirmCard: {
-    width: 340,
-    backgroundColor: colors.surface,
-    borderRadius: 14,
-    padding: spacing.lg,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.18,
-    shadowRadius: 12,
-  } as any,
-  confirmTitulo: {
-    fontFamily: typography.fontFamily,
-    fontSize: typography.sizes.md,
-    fontWeight: typography.weights.bold,
-    color: colors.textPrimary,
-    marginBottom: spacing.sm,
-  },
-  confirmMensaje: {
-    fontFamily: typography.fontFamily,
-    fontSize: typography.sizes.sm,
-    color: colors.textSecondary,
-    marginBottom: spacing.lg,
-    lineHeight: 20,
-  },
-  confirmBtns: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: spacing.sm,
-  } as any,
-});
-
-// ── Estilos modal detalle miembro ─────────────────────────────────────────
-const md = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: spacing.md,
-  },
-  card: {
-    width: '100%',
-    maxWidth: 420,
-    backgroundColor: colors.surface,
-    borderRadius: 20,
-    padding: spacing.lg,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.22,
-    shadowRadius: 20,
-    maxHeight: '85%' as any,
-  } as any,
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    marginBottom: spacing.md,
-  } as any,
-  avatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 14,
-    overflow: 'hidden' as any,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarImg: { width: '100%', height: '100%' },
-  inicial: {
-    fontFamily: typography.fontFamily,
-    fontSize: 22,
-    fontWeight: typography.weights.bold,
-    color: colors.surface,
-    opacity: 0.5,
-  },
-  nombre: {
-    fontFamily: typography.fontFamily,
-    fontSize: typography.sizes.md,
-    fontWeight: typography.weights.bold,
-    color: colors.textPrimary,
-  },
-  username: {
-    fontFamily: typography.fontFamily,
-    fontSize: typography.sizes.sm,
-    color: colors.textSecondary,
-    marginTop: 2,
-  },
-  closeBtn: { padding: spacing.xs },
-  divider: {
-    height: 1,
-    backgroundColor: colors.border,
-    marginBottom: spacing.md,
-  },
-  seccionTitulo: {
-    fontFamily: typography.fontFamily,
-    fontSize: 11,
-    fontWeight: typography.weights.bold,
-    color: colors.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: spacing.sm,
-  },
-  rolesScroll: { maxHeight: 280 },
-  rolRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.sm,
-    backgroundColor: `${colors.primary}08`,
-    borderRadius: 10,
-    marginBottom: spacing.xs,
-    borderWidth: 1,
-    borderColor: `${colors.primary}18`,
-  } as any,
-  rolIconWrap: {
-    width: 30,
-    height: 30,
-    borderRadius: 8,
-    backgroundColor: `${colors.primary}18`,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  rolNombre: {
-    fontFamily: typography.fontFamily,
-    fontSize: typography.sizes.sm,
-    fontWeight: typography.weights.bold,
-    color: colors.textPrimary,
-  },
-  rolAlcance: {
-    fontFamily: typography.fontFamily,
-    fontSize: 11,
-    color: colors.textSecondary,
-    marginTop: 2,
-  },
-  rolActions: {
-    flexDirection: 'row',
-    gap: spacing.xs,
-    alignItems: 'center',
-  } as any,
-  rolActionBtn: { padding: 6 },
-  vacio: {
-    fontFamily: typography.fontFamily,
-    fontSize: typography.sizes.sm,
-    color: colors.textSecondary,
-    fontStyle: 'italic',
-    textAlign: 'center',
-    paddingVertical: spacing.md,
-  },
-  footer: {
-    marginTop: spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    paddingTop: spacing.md,
-    alignItems: 'center',
-  },
-  retirarBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.md,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: `${colors.error}30`,
-    backgroundColor: `${colors.error}08`,
-  } as any,
-  retirarTxt: {
-    fontFamily: typography.fontFamily,
-    fontSize: typography.sizes.sm,
-    color: colors.error,
-    fontWeight: typography.weights.medium,
-  },
+  memberCard: { width: 120, height: 120, borderRadius: 16, overflow: 'hidden' as any, alignItems: 'center', justifyContent: 'center', position: 'relative' },
+  inicial:    { fontFamily: typography.fontFamily, fontSize: 36, fontWeight: typography.weights.bold, color: colors.surface, opacity: 0.35 },
+  overlay:    { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: `${colors.darkBg}B8`, paddingVertical: spacing.xs, paddingHorizontal: spacing.sm },
+  nombre:     { fontFamily: typography.fontFamily, fontSize: 10, fontWeight: typography.weights.bold, color: colors.surface, textAlign: 'center' } as any,
+  rolChip:    { marginTop: 6, backgroundColor: `${colors.primary}14`, borderColor: `${colors.primary}30`, borderWidth: 1, borderRadius: 20, paddingVertical: 3, paddingHorizontal: 8, alignItems: 'center', width: '100%' },
+  rolChipText:{ fontFamily: typography.fontFamily, fontSize: 9, fontWeight: typography.weights.bold, color: colors.primary, textAlign: 'center' },
+  rolChipExtra: { fontFamily: typography.fontFamily, fontSize: 8, color: colors.textSecondary, textAlign: 'center', marginTop: 1 },
+  verDetalle: { flexDirection: 'row', alignItems: 'center', gap: 2, marginTop: 4 } as any,
+  verDetalleTxt: { fontFamily: typography.fontFamily, fontSize: 9, color: colors.primary },
+  vacio:      { fontFamily: typography.fontFamily, fontSize: typography.sizes.sm, color: colors.textSecondary, fontStyle: 'italic' },
+  zIdx50:     { zIndex: 50, position: 'relative' } as any,
+  zIdx40:     { zIndex: 40, position: 'relative' } as any,
+  zIdx30:     { zIndex: 30, position: 'relative' } as any,
+  zIdx20:     { zIndex: 20, position: 'relative' } as any,
+  zIdx10:     { zIndex: 10, position: 'relative' } as any,
+  confirmOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center' },
+  confirmCard:{ width: 340, backgroundColor: colors.surface, borderRadius: 14, padding: spacing.lg, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.18, shadowRadius: 12 } as any,
+  confirmTitulo: { fontFamily: typography.fontFamily, fontSize: typography.sizes.md, fontWeight: typography.weights.bold, color: colors.textPrimary, marginBottom: spacing.sm },
+  confirmMensaje: { fontFamily: typography.fontFamily, fontSize: typography.sizes.sm, color: colors.textSecondary, marginBottom: spacing.lg, lineHeight: 20 },
+  confirmBtns:{ flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.sm } as any,
 });
