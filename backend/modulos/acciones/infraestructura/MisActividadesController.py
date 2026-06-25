@@ -56,6 +56,14 @@ def _verificar_acceso_actividad(usuario, accion_id: str, requiere_permiso: str =
         roles_manager = ['superadministrador', 'administrador_proyecto', 'coordinador_proyecto', 'coordinador_general']
         if UsuarioRolModel.objects.filter(usuario=usuario, proyecto_id=proyecto_id, rol__codigo__in=roles_manager, activo=True).exists():
             es_gestor = True
+        # Coordinador de Componente: gestor acotado a su componente (solo revisa, no carga)
+        elif UsuarioRolModel.objects.filter(
+            usuario=usuario,
+            componente_id=accion.component_id,
+            rol__codigo='coordinador_componente',
+            activo=True
+        ).exists():
+            es_gestor = True
 
     # Si se requiere verificar un permiso de rol/proyecto (ej: evidencias.ver o evidencias.subir)
     if requiere_permiso:
@@ -118,9 +126,21 @@ def _build_user_context(usuario, accion_ids: list, proyecto_ids: list) -> dict:
         pid = str(row['proyecto_id'])
         roles_por_proyecto.setdefault(pid, []).append(row['rol__nombre'])
 
+    # IDs de componentes de las acciones, para el chequeo de coordinador_componente
+    componente_ids = list(
+        AccionModel.objects.filter(id__in=accion_ids)
+        .values_list('component_id', flat=True)
+        .distinct()
+    )
+
     es_gestor = usuario.is_superuser or UsuarioRolModel.objects.filter(
         usuario=usuario, proyecto_id__in=proyecto_ids,
         rol__codigo__in=_ROLES_GESTOR, activo=True
+    ).exists() or UsuarioRolModel.objects.filter(
+        usuario=usuario,
+        componente_id__in=componente_ids,
+        rol__codigo='coordinador_componente',
+        activo=True
     ).exists()
 
     return {
@@ -156,6 +176,11 @@ def _serialize_actividad_detallada(accion, usuario, request=None, _ctx: dict | N
         es_gestor = usuario.is_superuser or UsuarioRolModel.objects.filter(
             usuario=usuario, proyecto_id=proyecto_id,
             rol__codigo__in=_ROLES_GESTOR, activo=True
+        ).exists() or UsuarioRolModel.objects.filter(
+            usuario=usuario,
+            componente_id=accion.component_id,
+            rol__codigo='coordinador_componente',
+            activo=True
         ).exists()
 
     tipo_asig = asignacion.tipo_asignacion if asignacion else None
