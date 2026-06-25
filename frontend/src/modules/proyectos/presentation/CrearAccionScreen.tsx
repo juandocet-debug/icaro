@@ -12,6 +12,7 @@ import { SearchableSelect, SelectOption } from '../../../shared/components/Searc
 import { colors } from '../../../shared/constants/colors';
 import { spacing } from '../../../shared/constants/spacing';
 import { typography } from '../../../shared/constants/typography';
+import { useIsMobile } from '../../../shared/hooks/useIsMobile';
 import { crearAccionMetaUseCase, listarMiembrosUseCase, asignacionResponsableRepo } from '../../../shared/dependencies';
 import { RequisitoVerificacion } from '../domain/Accion';
 import { ProyectoMiembro } from '../domain/ProyectoMiembro';
@@ -116,6 +117,7 @@ const dfStyles = StyleSheet.create({
 });
 
 export const CrearAccionScreen: React.FC<Props> = ({ componenteId, proyectoId }) => {
+  const isMobile = useIsMobile();
   const [nombre,      setNombre]      = useState('');
   const [descripcion, setDescripcion] = useState('');
   const [unidad,      setUnidad]      = useState('');
@@ -257,25 +259,49 @@ export const CrearAccionScreen: React.FC<Props> = ({ componenteId, proyectoId })
 
   return (
     <AppShell scrollable={false} style={styles.shell}>
-      <View style={styles.topBar}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={18} color={colors.textSecondary} />
-          <Text style={styles.backTxt}>Volver</Text>
-        </TouchableOpacity>
-        <View style={styles.titleContainer}>
-          <Text style={styles.pageTitle}>Crear Acción</Text>
-          <Text style={styles.pageSubtitle}>Completa la información para configurar esta acción</Text>
-        </View>
-        <View style={styles.headerRight}>
-          <Button label="Cancelar" variant="ghost" onPress={() => router.back()} style={{ marginRight: spacing.sm }} />
-          <Button label="Guardar" onPress={handleGuardar} loading={saving} disabled={saving} />
-        </View>
+      {/* Header — mobile: 2 filas, desktop: 1 fila */}
+      <View style={[styles.topBar, isMobile && styles.topBarMobile]}>
+        {isMobile ? (
+          // Fila superior móvil: Volver | Cancelar | Guardar
+          <>
+            <View style={styles.topBarRow1}>
+              <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+                <Ionicons name="arrow-back" size={18} color={colors.textSecondary} />
+                <Text style={styles.backTxt}>Volver</Text>
+              </TouchableOpacity>
+              <View style={styles.headerRight}>
+                <Button label="Cancelar" variant="ghost" onPress={() => router.back()} style={{ marginRight: spacing.sm }} />
+                <Button label="Guardar" onPress={handleGuardar} loading={saving} disabled={saving} />
+              </View>
+            </View>
+            <View style={styles.topBarRow2}>
+              <Text style={styles.pageTitle}>Crear Acción</Text>
+              <Text style={styles.pageSubtitle}>Completa la información para configurar esta acción</Text>
+            </View>
+          </>
+        ) : (
+          // Desktop: una fila
+          <>
+            <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+              <Ionicons name="arrow-back" size={18} color={colors.textSecondary} />
+              <Text style={styles.backTxt}>Volver</Text>
+            </TouchableOpacity>
+            <View style={styles.titleContainer}>
+              <Text style={styles.pageTitle}>Crear Acción</Text>
+              <Text style={styles.pageSubtitle}>Completa la información para configurar esta acción</Text>
+            </View>
+            <View style={styles.headerRight}>
+              <Button label="Cancelar" variant="ghost" onPress={() => router.back()} style={{ marginRight: spacing.sm }} />
+              <Button label="Guardar" onPress={handleGuardar} loading={saving} disabled={saving} />
+            </View>
+          </>
+        )}
       </View>
 
       {!!error && <View style={{ paddingHorizontal: spacing.xl, marginTop: spacing.md }}><ErrorMessage message={error} /></View>}
 
-      <ScrollView showsVerticalScrollIndicator={false} style={styles.scroll} contentContainerStyle={styles.scrollContent}>
-        <View style={styles.formColumns}>
+      <ScrollView showsVerticalScrollIndicator={false} style={styles.scroll} contentContainerStyle={[styles.scrollContent, isMobile && styles.scrollContentMobile]}>
+        <View style={[styles.formColumns, isMobile && styles.formColumnsMobile]}>
           {/* Columna Izquierda: Medición + Tipos de Evidencia */}
           <View style={styles.column}>
             {/* Medición */}
@@ -574,6 +600,9 @@ export const CrearAccionScreen: React.FC<Props> = ({ componenteId, proyectoId })
 const styles = StyleSheet.create({
   shell:      { backgroundColor: colors.background, flex: 1 },
   topBar:     { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.md, paddingHorizontal: spacing.xl, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.surface } as any,
+  topBarMobile: { flexDirection: 'column', paddingHorizontal: spacing.md, paddingVertical: spacing.sm, gap: 0 } as any,
+  topBarRow1: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%' } as any,
+  topBarRow2: { paddingTop: spacing.xs, paddingBottom: spacing.xs } as any,
   backBtn:    { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 4 } as any,
   backTxt:    { fontFamily: typography.fontFamily, fontSize: typography.sizes.sm, color: colors.textSecondary, fontWeight: typography.weights.medium },
   titleContainer: { flex: 1, marginLeft: spacing.sm },
@@ -582,7 +611,9 @@ const styles = StyleSheet.create({
   headerRight:{ flexDirection: 'row', alignItems: 'center' },
   scroll:   { flex: 1 },
   scrollContent: { padding: spacing.xl, gap: spacing.lg },
-  formColumns: { flexDirection: Platform.OS === 'web' ? 'row' : 'column', gap: spacing.lg },
+  scrollContentMobile: { padding: spacing.md } as any,
+  formColumns: { flexDirection: 'row', gap: spacing.lg } as any,
+  formColumnsMobile: { flexDirection: 'column' } as any,
   column: { flex: 1, gap: spacing.lg },
 
   card: {

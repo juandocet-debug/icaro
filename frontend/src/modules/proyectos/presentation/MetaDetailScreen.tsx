@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, Platform, ScrollView } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useIsMobile } from '../../../shared/hooks/useIsMobile';
 import { AppShell } from '../../../shared/components/AppShell';
 import { Button } from '../../../shared/components/Button';
 import { ErrorMessage } from '../../../shared/components/ErrorMessage';
@@ -275,6 +276,7 @@ const DraggableAcc: React.FC<DraggableAccProps> = ({
 interface Props { proyectoId: string; metaId: string; }
 
 export const MetaDetailScreen: React.FC<Props> = ({ proyectoId, metaId }) => {
+  const isMobile = useIsMobile();
   const { accessProfile } = useAccess();
   const isSuperAdmin = accessProfile?.esSuperadministrador === true;
 
@@ -647,49 +649,80 @@ export const MetaDetailScreen: React.FC<Props> = ({ proyectoId, metaId }) => {
     </div>
   );
 
-  // ── Canvas móvil (árbol estático) ─────────────────────────────────────────
+  // ── Canvas móvil (tree con acciones + pinch-zoom táctil) ─────────────────
   const MobileTree = (
-    <ScrollView horizontal>
-      <ScrollView>
-        <View style={styles.mobileTree}>
-          <MetaMapNode
-            kind="meta"
-            title={meta.nombre}
-            subtitle={meta.descripcion}
-            badge={meta.activo ? 'Activa' : 'Archivada'}
-            expanded={metaOpen}
-            onToggle={() => setMetaOpen(v => !v)}
-            onAdd={canCrearComponente ? () => setModalComp(true) : undefined}
-            onEdit={canEditarMeta ? () => setEditMeta(true) : undefined}
-            onDelete={canEliminarMeta ? () => setDeleteData({ kind: 'meta', id: meta.id }) : undefined}
-          />
-          {metaOpen && componentes.map((comp) => {
-            const isOpen = !!expanded[comp.id];
-            const accs   = acciones[comp.id] ?? [];
-            
-            const isCompDisabled = esCoordinadorComponenteRestringido && !componentesAsignadosIds.includes(comp.id);
-
-            return (
-              <View key={comp.id} style={styles.mobileComp}>
-                <View style={styles.mobileBranch} />
-                <MetaMapNode
-                  kind="componente"
-                  title={comp.nombre}
-                  subtitle={comp.descripcion}
-                  counter={accs.length}
-                  expanded={isOpen}
-                  onToggle={() => toggleComp(comp.id)}
-                  onAdd={canCrearAccion ? () => router.push(`/proyectos/${proyectoId}/acciones/crear?componenteId=${comp.id}` as any) : undefined}
-                  onEdit={canEditarComponente ? () => setEditComp(comp) : undefined}
-                  onDelete={canEliminarComponente ? () => setDeleteData({ kind: 'componente', id: comp.id }) : undefined}
-                  disabled={isCompDisabled}
-                />
-              </View>
-            );
-          })}
-        </View>
+    <div style={{ flex: 1, overflow: 'auto', WebkitOverflowScrolling: 'touch', touchAction: 'pan-x pan-y pinch-zoom' } as any}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={true} contentContainerStyle={{ minWidth: 320 }}>
+        <ScrollView showsVerticalScrollIndicator={true} contentContainerStyle={{ paddingBottom: 40 }}>
+          <View style={styles.mobileTree}>
+            <View style={styles.mobileHint}>
+              <Ionicons name="phone-landscape-outline" size={13} color={colors.textSecondary} />
+              <Text style={styles.mobileHintTxt}>Rota · Pinch zoom · Scroll para navegar</Text>
+            </View>
+            <MetaMapNode
+              kind="meta"
+              title={meta.nombre}
+              subtitle={meta.descripcion}
+              badge={meta.activo ? 'Activa' : 'Archivada'}
+              expanded={metaOpen}
+              onToggle={() => setMetaOpen(v => !v)}
+              onAdd={canCrearComponente ? () => setModalComp(true) : undefined}
+              onEdit={canEditarMeta ? () => setEditMeta(true) : undefined}
+              onDelete={canEliminarMeta ? () => setDeleteData({ kind: 'meta', id: meta.id }) : undefined}
+            />
+            {metaOpen && componentes.map((comp) => {
+              const isOpen = !!expanded[comp.id];
+              const accs   = acciones[comp.id] ?? [];
+              const isCompDisabled = esCoordinadorComponenteRestringido && !componentesAsignadosIds.includes(comp.id);
+              return (
+                <View key={comp.id} style={styles.mobileComp}>
+                  <View style={styles.mobileBranch} />
+                  <View style={{ flex: 1 }}>
+                    <MetaMapNode
+                      kind="componente"
+                      title={comp.nombre}
+                      subtitle={comp.descripcion}
+                      counter={accs.length}
+                      expanded={isOpen}
+                      onToggle={() => toggleComp(comp.id)}
+                      onAdd={canCrearAccion ? () => router.push(`/proyectos/${proyectoId}/acciones/crear?componenteId=${comp.id}` as any) : undefined}
+                      onEdit={canEditarComponente ? () => setEditComp(comp) : undefined}
+                      onDelete={canEliminarComponente ? () => setDeleteData({ kind: 'componente', id: comp.id }) : undefined}
+                      disabled={isCompDisabled}
+                    />
+                    {isOpen && accs.map((acc) => (
+                      <View key={acc.id} style={styles.mobileAccRow}>
+                        <View style={styles.mobileAccBranch} />
+                        <MetaMapNode
+                          kind="accion"
+                          title={acc.nombre}
+                          subtitle={acc.descripcion}
+                          ejecucion={acc.ejecucion}
+                          proyeccion={acc.proyeccion}
+                          unidad={acc.unidadMedida}
+                          avancePorcentaje={acc.avancePorcentaje}
+                          numRequisitos={acc.requisitosVerificacion?.length}
+                          resumenVerificacion={acc.resumenVerificacion}
+                          responsables={acc.responsables}
+                          onManageResponsibles={canGestionarResponsables ? () => setModalResp({ ...acc, componenteId: comp.id }) : undefined}
+                          onEvidencia={canSubirEvidencia ? () => setModalEvid({ ...acc, componenteId: comp.id }) : undefined}
+                          onEdit={canEditarAccion ? () => router.push(`/proyectos/${proyectoId}/acciones/${acc.id}/editar?componenteId=${comp.id}` as any) : undefined}
+                          onDelete={canEliminarAccion ? () => setDeleteData({ kind: 'accion', id: acc.id, extraId: comp.id }) : undefined}
+                          disabled={isCompDisabled}
+                        />
+                      </View>
+                    ))}
+                    {isOpen && loadingAcc[comp.id] && (
+                      <ActivityIndicator size="small" color={colors.primary} style={{ marginTop: spacing.sm, marginLeft: 32 }} />
+                    )}
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        </ScrollView>
       </ScrollView>
-    </ScrollView>
+    </div>
   );
 
   return (
@@ -703,7 +736,7 @@ export const MetaDetailScreen: React.FC<Props> = ({ proyectoId, metaId }) => {
       </View>
 
       <View style={styles.canvasWrap}>
-        {Platform.OS === 'web'
+        {Platform.OS === 'web' && !isMobile
           ? <MetaMapCanvas>{WebCanvas}</MetaMapCanvas>
           : MobileTree
         }
@@ -788,7 +821,11 @@ const styles = StyleSheet.create({
   emptyTxt:    { fontFamily: typography.fontFamily, fontSize: typography.sizes.sm, color: colors.textSecondary, fontStyle: 'italic' },
 
   // Mobile tree
-  mobileTree:   { padding: spacing.md },
-  mobileComp:   { flexDirection: 'row', alignItems: 'center', marginTop: spacing.md } as any,
-  mobileBranch: { width: 32, height: 2, backgroundColor: colors.primary, opacity: 0.4, marginRight: spacing.sm },
+  mobileTree:      { padding: spacing.md, minWidth: 320 },
+  mobileHint:      { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: spacing.sm, paddingVertical: 6, backgroundColor: `${colors.primary}08`, borderRadius: 8, marginBottom: spacing.md } as any,
+  mobileHintTxt:   { fontFamily: typography.fontFamily, fontSize: 11, color: colors.textSecondary, flex: 1 },
+  mobileComp:      { flexDirection: 'row', alignItems: 'flex-start', marginTop: spacing.md } as any,
+  mobileBranch:    { width: 32, height: 2, backgroundColor: colors.primary, opacity: 0.4, marginRight: spacing.sm, marginTop: 20 },
+  mobileAccRow:    { flexDirection: 'row', alignItems: 'flex-start', marginTop: spacing.sm, marginLeft: 16 } as any,
+  mobileAccBranch: { width: 24, height: 2, backgroundColor: colors.accent, opacity: 0.5, marginRight: spacing.sm, marginTop: 18 },
 });
