@@ -18,12 +18,15 @@ import { useAccess } from '../../auth/presentation/useAccess';
 interface Props {
   proyectoId: string;
   isAdmin: boolean;
+  /** Data pre-cargada por el padre: elimina el spinner en el primer render */
+  initialMetas?: any[] | null;
 }
 
-export const ProyectoMetasComponentes: React.FC<Props> = ({ proyectoId, isAdmin }) => {
+export const ProyectoMetasComponentes: React.FC<Props> = ({ proyectoId, isAdmin, initialMetas }) => {
   const { accessProfile, canInProject } = useAccess();
-  const [metas, setMetas] = useState<Meta[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Si el padre pre-cargó las metas, arrancamos con esas (sin spinner)
+  const [metas, setMetas] = useState<Meta[]>((initialMetas ?? []) as Meta[]);
+  const [loading, setLoading] = useState(initialMetas == null);
   const [error, setError] = useState<string | null>(null);
   const [modalMeta, setModalMeta] = useState(false);
   const [metaAEditar, setMetaAEditar] = useState<Meta | null>(null);
@@ -103,7 +106,15 @@ export const ProyectoMetasComponentes: React.FC<Props> = ({ proyectoId, isAdmin 
     }
   };
 
-  useEffect(() => { cargar(); }, [proyectoId, esCoordinadorComponenteRestringido, componentesAsignadosIds.join(',')]);
+  useEffect(() => {
+    // Solo re-cargar si no hay datos pre-cargados O si el usuario es coordinador restringido (filtrado)
+    if (initialMetas != null && !esCoordinadorComponenteRestringido) {
+      setMetas((initialMetas as Meta[]).filter(m => m.activo));
+      setLoading(false);
+      return;
+    }
+    cargar();
+  }, [proyectoId, esCoordinadorComponenteRestringido, componentesAsignadosIds.join(',')]);
 
 
 

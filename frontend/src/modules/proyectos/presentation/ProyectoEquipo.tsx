@@ -29,6 +29,13 @@ import {
 } from '../../../shared/dependencies';
 import { MemberRole } from '../domain/ProyectoMiembro';
 
+// ── Caché de sesión para datos globales (roles/usuarios) ─────────────────────
+// Se cargan una sola vez por sesión y no se re-piden entre proyectos
+const SESSION_CACHE: {
+  roles: Rol[] | null;
+  usuarios: any[] | null;
+} = { roles: null, usuarios: null };
+
 const AVATAR_COLORS = [colors.primary, colors.success, colors.accent, colors.primaryDark];
 
 // ── Modal detalle de miembro ────────────────────────────────────────────────
@@ -152,17 +159,22 @@ const MemberDetailModal: React.FC<MemberDetailModalProps> = ({
 interface Props {
   proyectoId: string;
   isAdmin: boolean;
+  /** Data pre-cargada por el padre: elimina el spinner en el primer render */
+  initialMiembros?: any[] | null;
 }
 
-export const ProyectoEquipo: React.FC<Props> = ({ proyectoId, isAdmin }) => {
-  const [miembros, setMiembros] = useState<ProyectoMiembro[]>([]);
+export const ProyectoEquipo: React.FC<Props> = ({ proyectoId, isAdmin, initialMiembros }) => {
+  // Si el padre pre-cargó los miembros, arrancamos sin spinner
+  const [miembros, setMiembros] = useState<ProyectoMiembro[]>((initialMiembros as any) ?? []);
   const [roles, setRoles] = useState<Rol[]>([]);
   const [metas, setMetas] = useState<Meta[]>([]);
   const [componentes, setComponentes] = useState<ComponentOption[]>([]);
   const [acciones, setAcciones] = useState<ActionOption[]>([]);
   const [usuariosOpts, setUsuariosOpts] = useState<SelectOption[]>([]);
 
-  const [loading, setLoading] = useState(true);
+  // Si initialMiembros fue provisto, no mostramos spinner global
+  const [loading, setLoading] = useState(initialMiembros == null);
+  const [formDataLoaded, setFormDataLoaded] = useState(false);
   // `refreshing` es true solo al recargar miembros post-mutación → no borra la UI
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -202,46 +214,13 @@ export const ProyectoEquipo: React.FC<Props> = ({ proyectoId, isAdmin }) => {
     }
   };
 
-  // ── Carga inicial en paralelo (roles/usuarios/componentes/metas no cambian) ─
+  // ── Carga inicial: solo miembros si initialMiembros no fue provisto ─────────
   const cargar = async () => {
     setLoading(true);
     setError(null);
-
     try {
-      if (isAdmin) {
-        // Todas las llamadas en paralelo → tiempo = la más lenta, no la suma
-        const [miembrosList, rolesList, todosUsuarios, compList, metasList] = await Promise.all([
-          listarMiembrosUseCase.ejecutar(proyectoId),
-          listarRolesActivosUseCase.ejecutar().catch(() => [] as Rol[]),
-          listarUsuariosUseCase.ejecutar().catch(() => []),
-          listarComponentesProyectoUseCase.ejecutar(proyectoId).catch(() => [] as ComponentOption[]),
-          listarMetasProyectoUseCase.ejecutar(proyectoId).catch(() => [] as Meta[]),
-        ]);
-
-        setMiembros(miembrosList);
-
-        if (rolesList.length > 0) {
-          setRoles(rolesList);
-          setRolId(rolesList[0].id);
-        }
-
-        setUsuariosOpts(
-          todosUsuarios
-            .filter((u: any) => u.isActive)
-            .map((u: any) => ({
-              id: u.username,
-              name: u.nombreCompleto || u.username,
-              description: u.username,
-              photoUrl: u.photoUrl,
-            }))
-        );
-
-        setComponentes(compList);
-        setMetas(metasList.filter((m: Meta) => m.activo));
-      } else {
-        const miembrosList = await listarMiembrosUseCase.ejecutar(proyectoId);
-        setMiembros(miembrosList);
-      }
+      const miembrosList = await listarMiembrosUseCase.ejecutar(proyectoId);
+      setMiembros(miembrosList);
     } catch (err) {
       console.error('Error al cargar equipo', err);
       setError('No se pudo cargar el equipo del proyecto.');
@@ -250,7 +229,58 @@ export const ProyectoEquipo: React.FC<Props> = ({ proyectoId, isAdmin }) => {
     }
   };
 
-  useEffect(() => { cargar(); }, [proyectoId]);
+  // ── Carga lazy del formulario (solo cuando el admin abre el form) ──────────
+  const cargarDatosFormulario = async () => {
+    if (formDataLoaded) return; // ya cargado, no re-fetch
+    try {
+      // Roles y usuarios: usar caché de sesión si disponible
+      const [rolesList, todosUsuarios, compList, metasList] = await Promise.all([
+        SESSION_CACHE.roles
+          ? Promise.resolve(SESSION_CACHE.roles)
+          : listarRolesActivosUseCase.ejecutar().catch(() => [] as Rol[]),
+        SESSION_CACHE.usuarios
+          ? Promise.resolve(SESSION_CACHE.usuarios)
+          : listarUsuariosUseCase.ejecutar().catch(() => []),
+        listarComponentesProyectoUseCase.ejecutar(proyectoId).catch(() => [] as ComponentOption[]),
+        listarMetasProyectoUseCase.ejecutar(proyectoId).catch(() => [] as Meta[]),
+      ]);
+
+      // Guardar en caché de sesión
+      if (!SESSION_CACHE.roles && rolesList.length > 0) SESSION_CACHE.roles = rolesList;
+      if (!SESSION_CACHE.usuarios && todosUsuarios.length > 0) SESSION_CACHE.usuarios = todosUsuarios;
+
+      if (rolesList.length > 0) {
+        setRoles(rolesList);
+        setRolId(rolesList[0].id);
+      }
+      setUsuariosOpts(
+        todosUsuarios
+          .filter((u: any) => u.isActive)
+          .map((u: any) => ({
+            id: u.username,
+            name: u.nombreCompleto || u.username,
+            description: u.username,
+            photoUrl: u.photoUrl,
+          }))
+      );
+      setComponentes(compList);
+      setMetas(metasList.filter((m: Meta) => m.activo));
+      setFormDataLoaded(true);
+    } catch (err) {
+      console.error('Error al cargar datos del formulario', err);
+    }
+  };
+
+  // Cargar miembros solo si el padre NO los pre-cargó
+  useEffect(() => {
+    if (initialMiembros != null) {
+      // Ya tenemos la data del padre
+      setMiembros(initialMiembros as any);
+      setLoading(false);
+    } else {
+      cargar();
+    }
+  }, [proyectoId]);
 
   // ── Cargar acciones cuando se selecciona componente ────────────────────────
   useEffect(() => {
@@ -441,7 +471,12 @@ export const ProyectoEquipo: React.FC<Props> = ({ proyectoId, isAdmin }) => {
             size="sm"
             variant={showForm ? 'ghost' : 'primary'}
             onPress={() => {
-              if (showForm) resetForm(); else setShowForm(true);
+              if (showForm) {
+                resetForm();
+              } else {
+                setShowForm(true);
+                cargarDatosFormulario(); // lazy: carga roles/usuarios/componentes solo si no están cargados
+              }
             }}
           />
         )}

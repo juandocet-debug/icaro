@@ -19,6 +19,8 @@ import {
   obtenerProyectoUseCase,
   eliminarProyectoUseCase,
   asignacionResponsableRepo,
+  listarMiembrosUseCase,
+  listarMetasProyectoUseCase,
 } from '../../../shared/dependencies';
 import { router } from 'expo-router';
 
@@ -37,6 +39,9 @@ export const ProyectoDetailScreen: React.FC<Props> = ({ proyectoId }) => {
   const { accessProfile, canInProject } = useAccess();
   const [proyecto, setProyecto] = useState<Proyecto | null>(null);
   const [tipos, setTipos] = useState<TipoDocumento[]>([]);
+  // Pre-cargados junto al proyecto para eliminar spinners en los paneles
+  const [initialMiembros, setInitialMiembros] = useState<any[] | null>(null);
+  const [initialMetas, setInitialMetas] = useState<any[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -104,10 +109,18 @@ export const ProyectoDetailScreen: React.FC<Props> = ({ proyectoId }) => {
   useEffect(() => {
     const cargar = async () => {
       try {
-        const p = await useCase.ejecutar(proyectoId);
-        const ts = await tiposRepo.listar(proyectoId);
+        // Cargar todo en paralelo: proyecto + tipos + miembros + metas
+        // Los paneles reciben data directa → no muestran spinner propio en primera carga
+        const [p, ts, miembros, metas] = await Promise.all([
+          useCase.ejecutar(proyectoId),
+          tiposRepo.listar(proyectoId),
+          listarMiembrosUseCase.ejecutar(proyectoId).catch(() => null),
+          listarMetasProyectoUseCase.ejecutar(proyectoId).catch(() => null),
+        ]);
         setProyecto(p);
         setTipos(ts);
+        setInitialMiembros(miembros);
+        setInitialMetas(metas);
       } catch {
         setError('No se pudo cargar el proyecto.');
       } finally {
@@ -332,8 +345,8 @@ export const ProyectoDetailScreen: React.FC<Props> = ({ proyectoId }) => {
               isMobileView={true}
             />
           )}
-          <ProyectoMetasComponentes proyectoId={proyectoId} isAdmin={isAdmin} />
-          {canVerEquipo && <ProyectoEquipo proyectoId={proyectoId} isAdmin={canManageEquipo} />}
+          <ProyectoMetasComponentes proyectoId={proyectoId} isAdmin={isAdmin} initialMetas={initialMetas} />
+          {canVerEquipo && <ProyectoEquipo proyectoId={proyectoId} isAdmin={canManageEquipo} initialMiembros={initialMiembros} />}
         </View>
       ) : (
         <View style={{ flexDirection: 'row', gap: spacing.lg, alignItems: 'flex-start', width: '100%' }}>
@@ -347,12 +360,12 @@ export const ProyectoDetailScreen: React.FC<Props> = ({ proyectoId }) => {
                 isMobile={false}
               />
             ) : (
-              canVerEquipo && <ProyectoEquipo proyectoId={proyectoId} isAdmin={canManageEquipo} />
+              canVerEquipo && <ProyectoEquipo proyectoId={proyectoId} isAdmin={canManageEquipo} initialMiembros={initialMiembros} />
             )}
           </View>
           <View style={{ flex: 1, minWidth: 240, gap: spacing.lg }}>
-            <ProyectoMetasComponentes proyectoId={proyectoId} isAdmin={isAdmin} />
-            {showMisActividades && canVerEquipo && <ProyectoEquipo proyectoId={proyectoId} isAdmin={canManageEquipo} />}
+            <ProyectoMetasComponentes proyectoId={proyectoId} isAdmin={isAdmin} initialMetas={initialMetas} />
+            {showMisActividades && canVerEquipo && <ProyectoEquipo proyectoId={proyectoId} isAdmin={canManageEquipo} initialMiembros={initialMiembros} />}
           </View>
         </View>
       )}
