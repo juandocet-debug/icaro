@@ -196,7 +196,7 @@ export const UsuariosContent: React.FC<UsuariosContentProps> = ({ showForm, setS
 
               {/* NOMBRES */}
               <Text style={styles.sectionLabel}>NOMBRES</Text>
-              <View style={styles.formRow}>
+              <View style={[styles.formRow, isMobile && { flexDirection: 'column' }]}>
                 <View style={[styles.fieldWrapper, { flex: 1 }]}>
                   <Text style={styles.fieldLabel}>Primer nombre <Text style={styles.required}>*</Text></Text>
                   <TextInput
@@ -218,7 +218,7 @@ export const UsuariosContent: React.FC<UsuariosContentProps> = ({ showForm, setS
                   />
                 </View>
               </View>
-              <View style={styles.formRow}>
+              <View style={[styles.formRow, isMobile && { flexDirection: 'column' }]}>
                 <View style={[styles.fieldWrapper, { flex: 1 }]}>
                   <Text style={styles.fieldLabel}>Primer apellido <Text style={styles.required}>*</Text></Text>
                   <TextInput
@@ -243,7 +243,7 @@ export const UsuariosContent: React.FC<UsuariosContentProps> = ({ showForm, setS
 
               {/* CONTACTO */}
               <Text style={styles.sectionLabel}>CONTACTO</Text>
-              <View style={styles.formRow}>
+              <View style={[styles.formRow, isMobile && { flexDirection: 'column' }]}>
                 <View style={[styles.fieldWrapper, { flex: 1 }]}>
                   <Text style={styles.fieldLabel}>Correo electrónico <Text style={styles.required}>*</Text></Text>
                   <TextInput
@@ -389,37 +389,39 @@ export const UsuariosContent: React.FC<UsuariosContentProps> = ({ showForm, setS
 
               {/* Acciones */}
               <View style={styles.userCardActions}>
+                {/* Fila de iconos: Editar + Eliminar */}
                 {isSuperAdmin && (
-                  <>
+                  <View style={styles.cardActionsRow}>
                     <TouchableOpacity
-                      style={styles.cardActionBtn}
+                      style={[styles.cardIconBtn, { borderColor: colors.primary }]}
                       onPress={() => setEditingUser(u)}
                     >
-                      <Ionicons name="create-outline" size={16} color={colors.primary} />
-                      <Text style={[styles.cardActionTxt, { color: colors.primary }]}>Editar</Text>
+                      <Ionicons name="create-outline" size={15} color={colors.primary} />
+                      <Text style={[styles.cardIconTxt, { color: colors.primary }]}>Editar</Text>
                     </TouchableOpacity>
                     {!u.isSuperuser && u.id !== userProfile?.userId && (
                       <TouchableOpacity
-                        style={styles.cardActionBtn}
+                        style={[styles.cardIconBtn, { borderColor: colors.error }]}
                         onPress={() => setDeletingUser(u)}
                       >
-                        <Ionicons name="trash-outline" size={16} color={colors.error} />
-                        <Text style={[styles.cardActionTxt, { color: colors.error }]}>Eliminar</Text>
+                        <Ionicons name="trash-outline" size={15} color={colors.error} />
+                        <Text style={[styles.cardIconTxt, { color: colors.error }]}>Eliminar</Text>
                       </TouchableOpacity>
                     )}
-                  </>
+                  </View>
                 )}
+                {/* Toggle Activar / Desactivar */}
                 {canDesactivar && u.id !== userProfile?.userId && (!u.isSuperuser || isSuperAdmin) && (
                   <TouchableOpacity
-                    style={[styles.cardActionBtn, { borderColor: u.isActive ? '#ef4444' : colors.success }]}
+                    style={[styles.cardToggleBtn, u.isActive ? styles.cardToggleDanger : styles.cardToggleSuccess]}
                     onPress={() => toggleActivo(u)}
                   >
                     <Ionicons
                       name={u.isActive ? 'pause-circle-outline' : 'play-circle-outline'}
-                      size={16}
-                      color={u.isActive ? '#ef4444' : colors.success}
+                      size={15}
+                      color={u.isActive ? colors.error : colors.success}
                     />
-                    <Text style={[styles.cardActionTxt, { color: u.isActive ? '#ef4444' : colors.success }]}>
+                    <Text style={[styles.cardIconTxt, { color: u.isActive ? colors.error : colors.success }]}>
                       {u.isActive ? 'Desactivar' : 'Activar'}
                     </Text>
                   </TouchableOpacity>
@@ -644,7 +646,22 @@ const styles = StyleSheet.create({
   userCardSub:  { fontFamily: typography.fontFamily, fontSize: 11, color: colors.textSecondary },
   userCardEmail:{ fontFamily: typography.fontFamily, fontSize: 11, color: '#6366f1' },
   userCardMeta: { paddingTop: 4 },
-  userCardActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingTop: 4, borderTopWidth: 1, borderTopColor: '#f1f5f9' } as any,
-  cardActionBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0' } as any,
-  cardActionTxt: { fontFamily: typography.fontFamily, fontSize: 12, fontWeight: '600' } as any,
-});
+  userCardActions: {
+    paddingTop: spacing.xs,
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
+    gap: 6,
+  } as any,
+  cardActionsRow: {
+    flexDirection: 'row',
+    gap: 8,
+  } as any,
+  cardIconBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+    borderWidth: 1,
+    backgroundColor: 'transparent',

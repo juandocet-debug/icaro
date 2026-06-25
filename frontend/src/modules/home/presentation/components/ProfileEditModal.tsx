@@ -32,6 +32,7 @@ export const ProfileEditModal: React.FC<Props> = ({ visible, onClose }) => {
   const [saving, setSaving] = useState(false);
   const [loadingPic, setLoadingPic] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   // Initialize fields on visible
   useEffect(() => {
@@ -44,6 +45,7 @@ export const ProfileEditModal: React.FC<Props> = ({ visible, onClose }) => {
       setCargo(userProfile.cargo ?? '');
       setError(null);
       setSuccess(false);
+      setPreviewUrl(null); // limpia preview al abrir
     }
   }, [visible, userProfile]);
 
@@ -58,8 +60,11 @@ export const ProfileEditModal: React.FC<Props> = ({ visible, onClose }) => {
           setError('La foto supera el límite de 20MB.');
           return;
         }
+        // Mostrar preview inmediatamente
+        const localUrl = URL.createObjectURL(f);
+        setPreviewUrl(localUrl);
         const foto: ProfilePhoto = {
-          uri: URL.createObjectURL(f),
+          uri: localUrl,
           name: f.name,
           mimeType: f.type as any,
         };
@@ -162,10 +167,10 @@ export const ProfileEditModal: React.FC<Props> = ({ visible, onClose }) => {
                   <View style={styles.loadingPicContainer}>
                     <ActivityIndicator size="small" color={colors.primary} />
                   </View>
-                ) : userProfile?.photoUrl ? (
+                ) : (previewUrl || userProfile?.photoUrl) ? (
                   <Image
-                    key={userProfile.photoUrl}
-                    source={{ uri: userProfile.photoUrl }}
+                    key={previewUrl || userProfile?.photoUrl}
+                    source={{ uri: (previewUrl || userProfile?.photoUrl)! }}
                     style={styles.avatarImg}
                   />
                 ) : (
