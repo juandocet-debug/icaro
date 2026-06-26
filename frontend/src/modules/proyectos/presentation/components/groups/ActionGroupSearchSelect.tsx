@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, ActivityIndicator, Pressable, Modal, Platform } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, ActivityIndicator, Pressable, Modal, Platform, useWindowDimensions } from 'react-native';
 import { useGroupSearch } from '../../hooks/useGroupSearch';
 import { ActionGroup } from '../../hooks/useActionGroups';
 
@@ -16,6 +16,10 @@ export function ActionGroupSearchSelect({ accionId, selectedGrupoId, onSelectGru
   const [isOpen, setIsOpen] = useState(false);
   const [selectedGrupo, setSelectedGrupo] = useState<ActionGroup | null>(null);
   const debounceRef = useRef<any>(null);
+
+  // Desktop web = navegador de escritorio (≥768px). Móvil web y nativo usan Modal sheet.
+  const { width } = useWindowDimensions();
+  const isDesktopWeb = Platform.OS === 'web' && width >= 768;
 
   // Load selected group details or initial list
   useEffect(() => {
@@ -112,7 +116,7 @@ export function ActionGroupSearchSelect({ accionId, selectedGrupoId, onSelectGru
   );
 
   return (
-    <View style={[styles.container, Platform.OS === 'web' ? { position: 'relative' as any, zIndex: 200 } : {}]}>
+    <View style={[styles.container, isDesktopWeb ? { position: 'relative' as any, zIndex: 200 } : {}]}>
       <Text style={styles.label}>
         Grupo / Cohorte <Text style={styles.required}>*</Text>
       </Text>
@@ -140,8 +144,8 @@ export function ActionGroupSearchSelect({ accionId, selectedGrupoId, onSelectGru
             <Text style={styles.arrowIcon}>▼</Text>
           </Pressable>
 
-          {/* WEB: dropdown inline con position:absolute */}
-          {Platform.OS === 'web' && isOpen && (
+          {/* DESKTOP WEB: dropdown inline con position:absolute */}
+          {isDesktopWeb && isOpen && (
             <>
               {/* Backdrop transparente para cerrar al hacer click afuera */}
               <View
@@ -161,8 +165,8 @@ export function ActionGroupSearchSelect({ accionId, selectedGrupoId, onSelectGru
         </View>
       )}
 
-      {/* NATIVO (iOS/Android): sheet desde abajo con Modal — evita clipping */}
-      {Platform.OS !== 'web' && (
+      {/* MÓVIL WEB + NATIVO: sheet desde abajo con Modal — evita clipping en overflow:hidden */}
+      {!isDesktopWeb && (
         <Modal
           visible={isOpen}
           transparent
