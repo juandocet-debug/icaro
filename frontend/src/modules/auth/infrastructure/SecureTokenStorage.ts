@@ -4,35 +4,36 @@ import { TokenStoragePort } from '../domain/TokenStoragePort';
 
 const ACCESS_KEY  = 'icaro_access_token';
 const REFRESH_KEY = 'icaro_refresh_token';
-// Clave en sessionStorage (web) — persiste en la pestaña activa, se borra al cerrarla
-const SESSION_ACCESS_KEY = 'icaro_session_access';
+// Clave en localStorage (web) — persiste entre recargas, cierre de pestaña y reinicios por cámara móvil.
+// NOTA: localStorage es accesible por JS. El refresh token sigue siendo cookie HTTP-Only (seguro).
+const WEB_ACCESS_KEY = 'icaro_access';
 
 // Cache en memoria — válido durante la sesión activa.
-// En web: respaldado por sessionStorage para sobrevivir recargas (F5).
+// En web: respaldado por localStorage para sobrevivir recargas Y reinicios de pestaña al usar cámara.
 // En native: respaldado por SecureStore.
 let _inMemoryAccessToken:  string | null = null;
 let _inMemoryRefreshToken: string | null = null;
 
-/** Lectura segura de sessionStorage (solo web, sin lanzar en SSR) */
-const _sessionGet = (key: string): string | null => {
+/** Lectura segura de localStorage (solo web, sin lanzar en SSR) */
+const _localGet = (key: string): string | null => {
   try {
-    return typeof sessionStorage !== 'undefined' ? sessionStorage.getItem(key) : null;
+    return typeof localStorage !== 'undefined' ? localStorage.getItem(key) : null;
   } catch {
     return null;
   }
 };
 
-/** Escritura segura en sessionStorage */
-const _sessionSet = (key: string, value: string): void => {
+/** Escritura segura en localStorage */
+const _localSet = (key: string, value: string): void => {
   try {
-    if (typeof sessionStorage !== 'undefined') sessionStorage.setItem(key, value);
+    if (typeof localStorage !== 'undefined') localStorage.setItem(key, value);
   } catch { /* ignorar — storage lleno o bloqueado */ }
 };
 
-/** Borrado seguro de sessionStorage */
-const _sessionRemove = (key: string): void => {
+/** Borrado seguro de localStorage */
+const _localRemove = (key: string): void => {
   try {
-    if (typeof sessionStorage !== 'undefined') sessionStorage.removeItem(key);
+    if (typeof localStorage !== 'undefined') localStorage.removeItem(key);
   } catch { /* ignorar */ }
 };
 
@@ -44,10 +45,10 @@ export const SecureTokenStorage: TokenStoragePort & {
     _inMemoryRefreshToken = refresh;
 
     if (Platform.OS === 'web') {
-      // Web: persiste el access token en sessionStorage para sobrevivir F5.
-      // - sessionStorage se borra automáticamente al cerrar la pestaña.
-      // - El refresh token NO se guarda aquí — viaja como cookie HTTP-Only.
-      _sessionSet(SESSION_ACCESS_KEY, access);
+      // Web: persiste el access token en localStorage para sobrevivir F5 Y reinicios de pestaña
+      // (por ej. cuando Chrome cierra la pestaña al abrir la cámara en móvil).
+      // El refresh token NO se guarda aquí — viaja como cookie HTTP-Only.
+      _localSet(WEB_ACCESS_KEY, access);
     } else {
       try {
         await SecureStore.setItemAsync(ACCESS_KEY, access);
@@ -63,7 +64,9 @@ export const SecureTokenStorage: TokenStoragePort & {
     _inMemoryRefreshToken = null;
 
     if (Platform.OS === 'web') {
-      _sessionRemove(SESSION_ACCESS_KEY);
+      _localRemove(WEB_ACCESS_KEY);
+      // También limpiar la clave vieja de sessionStorage por si existe de una sesión anterior
+      try { if (typeof sessionStorage !== 'undefined') sessionStorage.removeItem('icaro_session_access'); } catch {}
       // El refresh cookie lo elimina el servidor en /api/auth/logout/
     } else {
       try {
@@ -80,11 +83,18 @@ export const SecureTokenStorage: TokenStoragePort & {
     if (_inMemoryAccessToken) return _inMemoryAccessToken;
 
     if (Platform.OS === 'web') {
-      // 2. Web: sessionStorage sobrevive F5 dentro de la misma pestaña
-      const stored = _sessionGet(SESSION_ACCESS_KEY);
+      // 2. Web: localStorage sobrevive F5 y reinicios de pestaña (cámara móvil)
+      const stored = _localGet(WEB_ACCESS_KEY);
       if (stored) {
         _inMemoryAccessToken = stored; // hidratar memoria
         return stored;
+      }
+      // 3. Fallback: sessionStorage legado (por si la clave vieja existe)
+      const legacy = (() => { try { return typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('icaro_session_access') : null; } catch { return null; } })();
+      if (legacy) {
+        _inMemoryAccessToken = legacy;
+        _localSet(WEB_ACCESS_KEY, legacy); // migrar al nuevo storage
+        return legacy;
       }
       return null;
     }
