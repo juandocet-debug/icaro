@@ -17,10 +17,14 @@ COOKIE_MAX_AGE_REFRESH = 60 * 60 * 24  # 1 día  (igual que REFRESH_TOKEN_LIFETI
 
 def _cookie_kwargs() -> dict:
     """Parámetros comunes para las cookies de sesión."""
+    is_prod = not settings.DEBUG
     return dict(
         httponly=True,
-        secure=not settings.DEBUG,   # HTTPS en producción, HTTP en local
-        samesite='Lax',              # Lax permite redirecciones normales
+        secure=is_prod,       # HTTPS obligatorio en producción
+        # SameSite=None es necesario en producción cuando frontend y backend
+        # están en dominios distintos (Vercel → Railway).
+        # En desarrollo usamos Lax (localhost mismo origen).
+        samesite='None' if is_prod else 'Lax',
     )
 
 
