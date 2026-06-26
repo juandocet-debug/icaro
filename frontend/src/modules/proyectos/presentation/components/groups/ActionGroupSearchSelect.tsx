@@ -88,60 +88,75 @@ export function ActionGroupSearchSelect({ accionId, selectedGrupoId, onSelectGru
         </View>
       ) : (
         <View style={styles.selectWrapper}>
-          <Pressable style={[styles.selectInput, error ? styles.inputError : null]} onPress={() => setIsOpen(!isOpen)}>
+          <Pressable style={[styles.selectInput, error ? styles.inputError : null]} onPress={() => setIsOpen(true)}>
             <Text style={styles.selectInputPlaceholder}>
               Seleccionar grupo...
             </Text>
             <Text style={styles.arrowIcon}>▼</Text>
           </Pressable>
-
-          {isOpen && (
-            <View style={styles.dropdown}>
-              <TextInput
-                style={styles.searchBar}
-                placeholder="Buscar grupo por nombre o código..."
-                placeholderTextColor="#9ca3af"
-                value={query}
-                onChangeText={handleSearchChange}
-                autoFocus
-              />
-
-              {loading && options.length === 0 ? (
-                <View style={styles.loader}>
-                  <ActivityIndicator size="small" color="#3b82f6" />
-                </View>
-              ) : (
-                <FlatList
-                  data={options}
-                  keyExtractor={(item) => item.id}
-                  nestedScrollEnabled
-                  style={styles.list}
-                  onEndReached={handleLoadMore}
-                  onEndReachedThreshold={0.3}
-                  ListEmptyComponent={
-                    <Text style={styles.emptyText}>No se encontraron grupos activos.</Text>
-                  }
-                  renderItem={({ item }) => (
-                    <TouchableOpacity style={styles.optionRow} onPress={() => handleSelect(item)}>
-                      <Text style={styles.optionName}>{item.nombre}</Text>
-                      {item.codigo && (
-                        <View style={styles.codeBadge}>
-                          <Text style={styles.codeText}>{item.codigo}</Text>
-                        </View>
-                      )}
-                    </TouchableOpacity>
-                  )}
-                  ListFooterComponent={
-                    loading && hasMore ? (
-                      <ActivityIndicator size="small" color="#3b82f6" style={{ marginVertical: 8 }} />
-                    ) : null
-                  }
-                />
-              )}
-            </View>
-          )}
         </View>
       )}
+
+      {/* Modal para el dropdown — evita clipping por overflow:hidden en padres */}
+      <Modal
+        visible={isOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setIsOpen(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalBackdrop}
+          activeOpacity={1}
+          onPress={() => setIsOpen(false)}
+        />
+        <View style={styles.modalSheet}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Seleccionar Grupo</Text>
+            <TouchableOpacity onPress={() => setIsOpen(false)} style={styles.modalClose}>
+              <Text style={styles.modalCloseText}>✕</Text>
+            </TouchableOpacity>
+          </View>
+          <TextInput
+            style={styles.searchBar}
+            placeholder="Buscar grupo por nombre o código..."
+            placeholderTextColor="#9ca3af"
+            value={query}
+            onChangeText={handleSearchChange}
+            autoFocus
+          />
+          {loading && options.length === 0 ? (
+            <View style={styles.loader}>
+              <ActivityIndicator size="small" color="#3b82f6" />
+            </View>
+          ) : (
+            <FlatList
+              data={options}
+              keyExtractor={(item) => item.id}
+              style={styles.list}
+              onEndReached={handleLoadMore}
+              onEndReachedThreshold={0.3}
+              ListEmptyComponent={
+                <Text style={styles.emptyText}>No se encontraron grupos activos.</Text>
+              }
+              renderItem={({ item }) => (
+                <TouchableOpacity style={styles.optionRow} onPress={() => handleSelect(item)}>
+                  <Text style={styles.optionName}>{item.nombre}</Text>
+                  {item.codigo && (
+                    <View style={styles.codeBadge}>
+                      <Text style={styles.codeText}>{item.codigo}</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              )}
+              ListFooterComponent={
+                loading && hasMore ? (
+                  <ActivityIndicator size="small" color="#3b82f6" style={{ marginVertical: 8 }} />
+                ) : null
+              }
+            />
+          )}
+        </View>
+      </Modal>
 
       {error && <Text style={styles.errorHelperText}>{error}</Text>}
     </View>
@@ -285,5 +300,38 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 4,
     fontWeight: '500',
+  },
+  // ── Modal styles ──────────────────────────────────────────────────────────
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+  modalSheet: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingBottom: 32,
+    maxHeight: '60%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  modalTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1e293b',
+  },
+  modalClose: {
+    padding: 4,
+  },
+  modalCloseText: {
+    fontSize: 18,
+    color: '#64748b',
   },
 });

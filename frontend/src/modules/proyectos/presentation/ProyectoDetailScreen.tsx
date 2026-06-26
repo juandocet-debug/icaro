@@ -222,11 +222,10 @@ export const ProyectoDetailScreen: React.FC<Props> = ({ proyectoId }) => {
     try {
       await eliminarProyectoUseCase.ejecutar(proyectoId);
       router.replace('/proyectos');
-    } catch {
-      setUploadError('No se pudo eliminar el proyecto. Intenta nuevamente.');
     } finally {
       setEliminando(false);
     }
+    // Los errores se propagan al ConfirmarEliminarModal para mostrarse ahí
   };
 
   const filteredActs = useMemo(() => {

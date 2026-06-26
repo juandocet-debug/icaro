@@ -134,6 +134,11 @@ class ProyectoDetailController(APIView):
             return Response({'ok':False,'error':str(e)},status=403)
         except ValueError as e:
             return Response({'ok':False,'error':str(e)},status=404)
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f'Error eliminando proyecto {proyecto_id}: {e}', exc_info=True)
+            return Response({'ok':False,'error':f'Error al eliminar el proyecto: {str(e)}'},status=500)
 
 ALLOWED_IMAGE_TYPES = {'image/jpeg', 'image/jpg', 'image/png', 'image/webp'}
 MAX_IMAGE_SIZE = 20 * 1024 * 1024  # 20MB
