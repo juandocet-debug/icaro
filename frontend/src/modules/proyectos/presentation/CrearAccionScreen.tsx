@@ -23,6 +23,7 @@ import { useIsMobile } from '../../../shared/hooks/useIsMobile';
 import {
   useAccionForm, UNIDADES_SUGERIDAS, TIPOS_MIME, PLANTILLAS,
 } from './hooks/useAccionForm';
+import { useAccess } from '../../auth/presentation/useAccess';
 
 // ── DateField (web usa <input type="date">, nativo usa TextInput) ─────────────
 const DateField: React.FC<{
@@ -79,7 +80,7 @@ export const CrearAccionScreen: React.FC<Props> = ({ componenteId, proyectoId })
     nombre, setNombre, descripcion, setDescripcion,
     unidad, setUnidad, proyeccion, setProyeccion,
     startDate, setStartDate, endDate, setEndDate,
-    requisitos, tiposEvidencia, tipoEvInput, setTipoEvInput,
+    requisitos, requiereGrupos, setRequiereGrupos, tiposEvidencia, tipoEvInput, setTipoEvInput,
     saving, error,
     miembros, loadingMiembros, selectedUserId, setSelectedUserId,
     tipoAsig, setTipoAsig, seleccionados, opcionesMiembros,
@@ -88,6 +89,9 @@ export const CrearAccionScreen: React.FC<Props> = ({ componenteId, proyectoId })
     addTipoEvidencia, removeTipoEvidencia,
     handleGuardar,
   } = useAccionForm(componenteId, proyectoId);
+
+  const { canInProject } = useAccess();
+  const canAsignarResponsables = canInProject('acciones.asignar_responsables', proyectoId ?? '');
 
   return (
     <AppShell scrollable={false} style={s.shell}>
@@ -159,6 +163,24 @@ export const CrearAccionScreen: React.FC<Props> = ({ componenteId, proyectoId })
                 <DateField label="Fecha inicio" value={startDate} onChange={setStartDate} placeholder="AAAA-MM-DD" />
                 <DateField label="Fecha fin" value={endDate} onChange={setEndDate} placeholder="AAAA-MM-DD" />
               </View>
+
+              {/* Requiere Grupos Switch */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: colors.border, pt: spacing.md, marginTop: spacing.md, paddingTop: spacing.md }}>
+                <View style={{ flex: 1, marginRight: spacing.md }}>
+                  <Text style={{ fontFamily: typography.fontFamily, fontSize: typography.sizes.sm, color: colors.textPrimary, fontWeight: '700' }}>
+                    Esta acción requiere grupos
+                  </Text>
+                  <Text style={{ fontFamily: typography.fontFamily, fontSize: 12, color: colors.textSecondary, marginTop: 2 }}>
+                    Si se activa, el profesional de carga deberá seleccionar a qué grupo pertenece cada evidencia.
+                  </Text>
+                </View>
+                <Switch
+                  value={requiereGrupos}
+                  onValueChange={setRequiereGrupos}
+                  trackColor={{ false: '#d1d5db', true: '#3b82f6' }}
+                  thumbColor={requiereGrupos ? '#ffffff' : '#f4f3f4'}
+                />
+              </View>
             </View>
 
             {/* Tipos de Evidencia Operativa */}
@@ -194,7 +216,8 @@ export const CrearAccionScreen: React.FC<Props> = ({ componenteId, proyectoId })
 
           {/* ── Columna Derecha: Responsables + Requisitos ── */}
           <View style={s.column}>
-            {/* Responsables */}
+            {/* Responsables — solo si tiene permiso de asignar */}
+            {canAsignarResponsables && (
             <View style={[s.card, { zIndex: 10, position: 'relative' }]}>
               <SectionHeader icon="people" title="RESPONSABLES" subtitle="Asigna responsables y apoyos" />
               <View style={s.typeSelector}>
@@ -248,6 +271,7 @@ export const CrearAccionScreen: React.FC<Props> = ({ componenteId, proyectoId })
                 </View>
               )}
             </View>
+            )}
 
             {/* Requisitos de Verificación */}
             <View style={s.card}>

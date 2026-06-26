@@ -266,6 +266,7 @@ def _serialize_actividad_detallada(accion, usuario, request=None, _ctx: dict | N
             'unidad_medida': accion.unidad_medida or 'unidades',
             'avance_porcentaje': pct,
             'tipos_evidencia_permitidos': getattr(accion, 'tipos_evidencia_permitidos', []) or [],
+            'requiere_grupos': bool(getattr(accion, 'requiere_grupos', False)),
             'requisitos_verificacion': requisitos_data,
         },
         'mi_asignacion': {

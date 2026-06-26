@@ -45,8 +45,20 @@ interface Props { proyectoId: string; metaId: string; }
 
 export const MetaDetailScreen: React.FC<Props> = ({ proyectoId, metaId }) => {
   const isMobile = useIsMobile();
-  const { accessProfile } = useAccess();
+  const { accessProfile, canInProject, isLoading: accessLoading } = useAccess();
   const isSuperAdmin = accessProfile?.esSuperadministrador === true;
+
+  const canVerMetas = isSuperAdmin || 
+    canInProject('metas.ver', proyectoId) || 
+    (accessProfile?.asignaciones?.some(
+      (a) => a.proyectoId === proyectoId && a.rolCodigo === 'coordinador_componente'
+    ) ?? false);
+
+  React.useEffect(() => {
+    if (!accessLoading && accessProfile && !canVerMetas) {
+      router.replace('/acceso-denegado');
+    }
+  }, [accessLoading, accessProfile, canVerMetas]);
 
   // ── Permisos ─────────────────────────────────────────────────────────────
   const { canDo } = useProjectPermission(proyectoId);
@@ -99,7 +111,7 @@ export const MetaDetailScreen: React.FC<Props> = ({ proyectoId, metaId }) => {
   });
 
   // ── Cargando / Error ──────────────────────────────────────────────────────
-  if (loading) return (
+  if (loading || accessLoading || !accessProfile) return (
     <AppShell scrollable={false}>
       <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: spacing.xxl }} />
     </AppShell>

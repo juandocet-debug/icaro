@@ -9,6 +9,7 @@ export const useMisActividades = (selectedAccionId?: string) => {
   const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState('');
   const [estado, setEstado] = useState<'todas' | 'pendientes' | 'completadas'>('todas');
+  const [selectedMeta, setSelectedMeta] = useState<string>('todas');
 
   // Detalle de actividad seleccionada
   const [selectedAct, setSelectedAct] = useState<any | null>(null);
@@ -31,6 +32,7 @@ export const useMisActividades = (selectedAccionId?: string) => {
   const [evDescripcion, setEvDescripcion] = useState('');
   const [evFecha, setEvFecha] = useState('');
   const [evCantidad, setEvCantidad] = useState('');
+  const [evGrupoId, setEvGrupoId] = useState('');
   const [evModalErr, setEvModalErr] = useState<string | null>(null);
   const [evModalSaving, setEvModalSaving] = useState(false);
 
@@ -59,9 +61,8 @@ export const useMisActividades = (selectedAccionId?: string) => {
       const res = await asignacionResponsableRepo.listarMisActividades(undefined, q);
       const datos = res.datos || [];
       setTodasActs(datos);
-      if (datos.length > 0 && !selectedAct) {
-        cargarDetalle(datos[0].accion.id);
-      }
+      // No auto-seleccionar la primera actividad al cargar —
+      // el usuario debe hacer clic para expandir el acordeón.
     } catch {
       setError('No se pudieron cargar las actividades.');
     } finally {
@@ -94,6 +95,16 @@ export const useMisActividades = (selectedAccionId?: string) => {
       const res = await api.get(`/api/mis-actividades/${accionId}/evidencias-operativas/`);
       const evs = res.data.datos || [];
       setEvidencias(evs);
+      
+      // Auto-seleccionar la primera carpeta disponible si no hay una activa
+      if (evs.length > 0) {
+        setActiveEvId((prev: any) => {
+          const exists = evs.some((e: any) => String(e.id) === String(prev));
+          return exists ? prev : String(evs[0].id);
+        });
+      } else {
+        setActiveEvId(null);
+      }
     } catch {
       // Omitir
     } finally {
@@ -113,9 +124,26 @@ export const useMisActividades = (selectedAccionId?: string) => {
 
   // Filtros client-side de actividades
   const isComp = (a: any) => a.verificacion?.estado === 'completo';
-  const filteredActs = estado === 'todas' ? todasActs
-    : estado === 'completadas' ? todasActs.filter(isComp)
-    : todasActs.filter(a => !isComp(a));
+
+  // Lista única de metas disponibles
+  const metasDisponibles = useMemo(() => {
+    const nombres = todasActs
+      .map(a => a.accion?.meta_nombre as string)
+      .filter((n): n is string => !!n);
+    return Array.from(new Set(nombres)).sort();
+  }, [todasActs]);
+
+  const filteredActs = useMemo(() => {
+    let acts = todasActs;
+    // Filtro por meta
+    if (selectedMeta !== 'todas') {
+      acts = acts.filter(a => a.accion?.meta_nombre === selectedMeta);
+    }
+    // Filtro por estado
+    if (estado === 'completadas') acts = acts.filter(isComp);
+    else if (estado === 'pendientes') acts = acts.filter(a => !isComp(a));
+    return acts;
+  }, [todasActs, estado, selectedMeta]);
 
   const FILTROS = [
     { id: 'todas', label: 'Todas', cnt: todasActs.length },
@@ -136,7 +164,7 @@ export const useMisActividades = (selectedAccionId?: string) => {
 
   // Evidencia Operativa Activa
   const activeEv = useMemo(() => {
-    return evidencias.find(e => e.id === activeEvId) || null;
+    return evidencias.find(e => String(e.id) === String(activeEvId)) || null;
   }, [evidencias, activeEvId]);
 
   // Requisitos de verificación con sus soportes cargados en la evidencia activa
@@ -162,11 +190,16 @@ export const useMisActividades = (selectedAccionId?: string) => {
   }, [requisitosEvidenciaActiva]);
 
   // ── Crear Nueva Evidencia Operativa ────────────────────────────────────
-  const openEvModal = () => {
-    setEvNombre('');
+  const openEvModal = (act?: any) => {
+    const actData = act || selectedAct;
+    const tipos: string[] = actData?.accion?.tipos_evidencia_permitidos ?? [];
+    const unidad: string = actData?.accion?.unidad_medida || '';
+    // Si no hay tipos configurados, auto-poblar nombre y cantidad
+    setEvNombre(tipos.length === 0 ? unidad : '');
+    setEvCantidad(tipos.length === 0 ? '1' : '');
     setEvDescripcion('');
     setEvFecha(new Date().toISOString().split('T')[0]);
-    setEvCantidad('');
+    setEvGrupoId('');
     setEvModalErr(null);
     setShowEvModal(true);
   };
@@ -181,11 +214,12 @@ export const useMisActividades = (selectedAccionId?: string) => {
         descripcion: evDescripcion.trim() || null,
         fecha_ejecucion: evFecha || null,
         cantidad_ejecutada: evCantidad ? parseFloat(evCantidad) : 0,
+        grupo_id: evGrupoId || null,
       });
       setShowEvModal(false);
       await cargarEvidencias(selectedAct.accion.id);
       if (res.data.datos) {
-        setActiveEvId(res.data.datos.id);
+        setActiveEvId(String(res.data.datos.id));
       }
     } catch (e: any) {
       setEvModalErr(e?.response?.data?.error || 'Error al crear la evidencia.');
@@ -309,13 +343,15 @@ export const useMisActividades = (selectedAccionId?: string) => {
   };
 
   return {
-    todasActs, loading, error, q, setQ, estado, setEstado, filteredActs, FILTROS,
+    todasActs, loading, error, q, setQ, estado, setEstado,
+    selectedMeta, setSelectedMeta, metasDisponibles,
+    filteredActs, FILTROS,
     selectedAct, detailLoad, detailErr, cargarDetalle,
     evidencias, evidenciasLoad, activeEvId, setActiveEvId,
     evQ, setEvQ, evFechaDesde, setEvFechaDesde, evFechaHasta, setEvFechaHasta,
     filteredEvidencias,
     showEvModal, setShowEvModal, evNombre, setEvNombre, evDescripcion, setEvDescripcion,
-    evFecha, setEvFecha, evCantidad, setEvCantidad, evModalErr, evModalSaving, openEvModal, handleCreateEvidencia,
+    evFecha, setEvFecha, evCantidad, setEvCantidad, evGrupoId, setEvGrupoId, evModalErr, evModalSaving, openEvModal, handleCreateEvidencia,
     soporteReqId, setSoporteReqId, soporteFile, setSoporteFile, soporteFileName, setSoporteFileName,
     soporteFecha, setSoporteFecha, soporteObs, setSoporteObs, soporteErr, soporteSaving, handleGuardarSoporte, handleDeleteSoporte, handleEnviarEvidencia,
     reviewObs, setReviewObs, reviewSaving, reviewErr, handleReviewEvidencia, handleReabrirEvidencia,

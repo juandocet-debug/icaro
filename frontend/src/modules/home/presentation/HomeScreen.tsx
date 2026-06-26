@@ -156,7 +156,10 @@ export const HomeScreen: React.FC = () => {
     <View style={[styles.dashboardGrid, { flexDirection: isSplit ? 'row' : 'column' }]}>
       {/* Columna Izquierda (65% en Web) */}
       <View style={isSplit ? styles.leftColumn : styles.fullWidth}>
-        <WelcomeBanner username={userProfile?.username ?? 'Usuario'} />
+        <WelcomeBanner
+          name={userProfile ? [userProfile.primerNombre, userProfile.primerApellido].filter(Boolean).join(' ') || userProfile.username : 'Usuario'}
+          photoUrl={userProfile?.photoUrl}
+        />
 
         {/* Barra de perfil/logout — solo en móvil */}
         {!isSplit && (

@@ -21,6 +21,7 @@ export interface MetaRepositoryPort {
     tiposEvidencia?: string[];
     startDate?: string | null;
     endDate?: string | null;
+    requiereGrupos?: boolean;
   }): Promise<Accion>;
   actualizarComponente(proyectoId: string, compId: string, datos: { nombre?: string; descripcion?: string }): Promise<Componente>;
   eliminarComponente(proyectoId: string, compId: string): Promise<void>;
@@ -32,6 +33,7 @@ export interface MetaRepositoryPort {
     tiposEvidencia?: string[];
     startDate?: string | null;
     endDate?: string | null;
+    requiereGrupos?: boolean;
   }): Promise<Accion>;
   eliminarAccion(compId: string, accionId: string): Promise<void>;
 }

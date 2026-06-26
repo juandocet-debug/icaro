@@ -102,6 +102,11 @@ export const ProyectoDetailScreen: React.FC<Props> = ({ proyectoId }) => {
     ['superadministrador', 'administrador_proyecto', 'coordinador_proyecto', 'coordinador_general', 'coordinador_componente'].includes(a.rolCodigo)
   ) ?? false);
 
+  const isCoordinadorComponente = !isSuperAdmin && !isGestor && (accessProfile?.asignaciones?.some(
+    (a) => a.proyectoId === proyectoId && a.rolCodigo === 'coordinador_componente'
+  ) ?? false);
+
+  // Solo profesional_carga ve la sección "Mis Actividades"
   const showMisActividades = !isCoordinadorOAdmin && (accessProfile?.asignaciones?.some(
     (a) => a.proyectoId === proyectoId && a.rolCodigo === 'profesional_carga'
   ) ?? false);
@@ -274,7 +279,7 @@ export const ProyectoDetailScreen: React.FC<Props> = ({ proyectoId }) => {
       {/* Cabecera superior de acciones */}
       <ProyectoDetailHeaderActions
         proyectoId={proyectoId}
-        isGestor={isGestor}
+        isGestor={isGestor || isCoordinadorComponente}
         isSuperAdmin={isSuperAdmin}
         eliminando={eliminando}
         solicitarEliminacion={() => setShowConfirmModal(true)}
@@ -345,7 +350,7 @@ export const ProyectoDetailScreen: React.FC<Props> = ({ proyectoId }) => {
               isMobileView={true}
             />
           )}
-          <ProyectoMetasComponentes proyectoId={proyectoId} isAdmin={isAdmin} initialMetas={initialMetas} />
+          {canVerMetas && <ProyectoMetasComponentes proyectoId={proyectoId} isAdmin={isAdmin} initialMetas={initialMetas} />}
           {canVerEquipo && <ProyectoEquipo proyectoId={proyectoId} isAdmin={canManageEquipo} initialMiembros={initialMiembros} />}
         </View>
       ) : (
@@ -364,7 +369,7 @@ export const ProyectoDetailScreen: React.FC<Props> = ({ proyectoId }) => {
             )}
           </View>
           <View style={{ flex: 1, minWidth: 240, gap: spacing.lg }}>
-            <ProyectoMetasComponentes proyectoId={proyectoId} isAdmin={isAdmin} initialMetas={initialMetas} />
+            {canVerMetas && <ProyectoMetasComponentes proyectoId={proyectoId} isAdmin={isAdmin} initialMetas={initialMetas} />}
             {showMisActividades && canVerEquipo && <ProyectoEquipo proyectoId={proyectoId} isAdmin={canManageEquipo} initialMiembros={initialMiembros} />}
           </View>
         </View>

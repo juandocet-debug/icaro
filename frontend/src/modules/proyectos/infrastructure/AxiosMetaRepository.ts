@@ -41,6 +41,7 @@ type ApiAccion = {
   responsables?: { id: string; username: string; nombre_completo: string; foto_url: string | null }[];
   start_date?: string | null;
   end_date?: string | null;
+  requiere_grupos?: boolean;
 };
 
 const mapMeta = (d: ApiMeta): Meta => ({
@@ -87,6 +88,7 @@ const mapAccion = (d: ApiAccion): Accion => ({
   })),
   startDate: d.start_date ?? null,
   endDate: d.end_date ?? null,
+  requiereGrupos: d.requiere_grupos,
 });
 
 export class AxiosMetaRepository implements MetaRepositoryPort {
@@ -162,6 +164,7 @@ export class AxiosMetaRepository implements MetaRepositoryPort {
     tiposEvidencia?: string[];
     startDate?: string | null;
     endDate?: string | null;
+    requiereGrupos?: boolean;
   }): Promise<Accion> {
     const res = await api.post<{ ok: boolean; datos: ApiAccion }>(
       `/api/acciones/${componenteId}/acciones/`,
@@ -175,6 +178,7 @@ export class AxiosMetaRepository implements MetaRepositoryPort {
         tipos_evidencia_permitidos: datos.tiposEvidencia ?? [],
         start_date: datos.startDate ?? null,
         end_date: datos.endDate ?? null,
+        requiere_grupos: datos.requiereGrupos ?? false,
       }
     );
     return mapAccion(res.data.datos);
@@ -202,6 +206,7 @@ export class AxiosMetaRepository implements MetaRepositoryPort {
     tiposEvidencia?: string[];
     startDate?: string | null;
     endDate?: string | null;
+    requiereGrupos?: boolean;
   }): Promise<Accion> {
     const payload: any = {};
     if (datos.nombre !== undefined) payload.name = datos.nombre;
@@ -211,6 +216,7 @@ export class AxiosMetaRepository implements MetaRepositoryPort {
     if (datos.tiposEvidencia !== undefined) payload.tipos_evidencia_permitidos = datos.tiposEvidencia;
     if (datos.startDate !== undefined) payload.start_date = datos.startDate;
     if (datos.endDate !== undefined) payload.end_date = datos.endDate;
+    if (datos.requiereGrupos !== undefined) payload.requiere_grupos = datos.requiereGrupos;
     const res = await api.put<{ ok: boolean; datos: ApiAccion }>(
       `/api/acciones/${compId}/acciones/${accionId}/`,
       payload

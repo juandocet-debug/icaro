@@ -38,4 +38,5 @@ export interface Accion {
   responsables?: ResponsableResumen[];
   startDate?: string | null;
   endDate?: string | null;
+  requiereGrupos?: boolean;
 }

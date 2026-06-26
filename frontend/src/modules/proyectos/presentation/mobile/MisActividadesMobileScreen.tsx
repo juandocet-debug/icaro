@@ -3,6 +3,8 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Image,
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Circle } from 'react-native-svg';
 import { useMisActividades } from '../hooks/useMisActividades';
+import { api } from '../../../../services/api';
+import { ActionGroupSearchSelect } from '../components/groups/ActionGroupSearchSelect';
 
 const DateTimePicker = Platform.OS !== 'web' ? require('@react-native-community/datetimepicker').default : null;
 import { colors } from '../../../../shared/constants/colors';
@@ -10,6 +12,78 @@ import { spacing } from '../../../../shared/constants/spacing';
 import { typography } from '../../../../shared/constants/typography';
 import { EvidenciaCaptureSheet } from '../EvidenciaCaptureSheet';
 import { ErrorMessage } from '../../../../shared/components/ErrorMessage';
+
+/** Dropdown compacto para filtrar por meta en móvil */
+const MetaFilterDropdown: React.FC<{
+  metas: string[];
+  selected: string;
+  onSelect: (v: string) => void;
+}> = ({ metas, selected, onSelect }) => {
+  const [open, setOpen] = useState(false);
+  const label = selected === 'todas' ? 'Meta: Todas' : `Meta: ${selected}`;
+  const hasFilter = selected !== 'todas';
+  return (
+    <>
+      <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}>
+        <TouchableOpacity
+          onPress={() => setOpen(true)}
+          style={{
+            flexDirection: 'row', alignItems: 'center', gap: 6,
+            backgroundColor: hasFilter ? '#ede9fe' : '#f8fafc',
+            borderWidth: 1, borderColor: hasFilter ? '#7c3aed' : '#e2e8f0',
+            borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6,
+            flex: 1,
+          }}
+        >
+          <Ionicons name="filter-outline" size={13} color={hasFilter ? '#7c3aed' : '#64748b'} />
+          <Text style={{ flex: 1, fontFamily: typography.fontFamily, fontSize: 12, fontWeight: hasFilter ? '700' : '400', color: hasFilter ? '#7c3aed' : '#64748b' }} numberOfLines={1}>
+            {label}
+          </Text>
+          <Ionicons name="chevron-down" size={13} color={hasFilter ? '#7c3aed' : '#94a3b8'} />
+        </TouchableOpacity>
+        {hasFilter && (
+          <TouchableOpacity onPress={() => onSelect('todas')} style={{ marginLeft: 8, padding: 4 }}>
+            <Ionicons name="close-circle" size={18} color="#7c3aed" />
+          </TouchableOpacity>
+        )}
+      </View>
+      <Modal visible={open} transparent animationType="slide" onRequestClose={() => setOpen(false)}>
+        <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' }} activeOpacity={1} onPress={() => setOpen(false)} />
+        <View style={{ backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: 32, maxHeight: '60%' }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}>
+            <Text style={{ fontFamily: typography.fontFamily, fontSize: 15, fontWeight: '700', color: '#1e293b' }}>Filtrar por Meta</Text>
+            <TouchableOpacity onPress={() => setOpen(false)}>
+              <Ionicons name="close" size={22} color="#64748b" />
+            </TouchableOpacity>
+          </View>
+          <ScrollView>
+            {['todas', ...metas].map((m) => {
+              const isActive = selected === m;
+              const displayName = m === 'todas' ? 'Todas las metas' : m;
+              return (
+                <TouchableOpacity
+                  key={m}
+                  onPress={() => { onSelect(m); setOpen(false); }}
+                  style={{
+                    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+                    paddingHorizontal: 20, paddingVertical: 14,
+                    borderBottomWidth: 1, borderBottomColor: '#f8fafc',
+                    backgroundColor: isActive ? '#faf5ff' : '#fff',
+                  }}
+                >
+                  <Text style={{ fontFamily: typography.fontFamily, fontSize: 14, color: isActive ? '#7c3aed' : '#334155', fontWeight: isActive ? '700' : '400' }}>
+                    {displayName}
+                  </Text>
+                  {isActive && <Ionicons name="checkmark" size={18} color="#7c3aed" />}
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+      </Modal>
+    </>
+  );
+};
 
 const fileIcon = (t: string): any =>
   t?.startsWith('image/') ? 'image-outline'
@@ -24,6 +98,14 @@ import { env } from '../../../../config/env';
 const toUrl = (url: string) => {
   const API_BASE = env.apiUrl;
   return url?.startsWith('http') ? url : `${API_BASE}${url}`;
+};
+
+/** Thumbnail Cloudinary 160x160 optimizado para grillas de 80x80 */
+const cloudinaryThumb = (url: string): string => {
+  if (!url) return url;
+  const fullUrl = toUrl(url);
+  if (!fullUrl.includes('res.cloudinary.com')) return fullUrl;
+  return fullUrl.replace('/upload/', '/upload/c_fill,w_160,h_160,q_auto,f_auto/');
 };
 
 interface MisActividadesMobileScreenProps {
@@ -82,12 +164,25 @@ export const MisActividadesMobileScreen: React.FC<MisActividadesMobileScreenProp
   // Estados locales para la selección rápida de carga de soporte en móvil
   const [cargarSoporteAct, setCargarSoporteAct] = useState<any | null>(null);
   const [cargarSoporteReq, setCargarSoporteReq] = useState<any | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+
+  // Estados para custom alert/toast y confirmación de envío
+  const [showConfirmSend, setShowConfirmSend] = useState<any | null>(null); // contiene { accionId, evId } o null
+  const [sendingEv, setSendingEv] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3500);
+  };
 
   const toggleAccordion = (id: string) => {
     if (activeAccordionId === id) {
       setActiveAccordionId(null);
       state.setActiveEvId(null);
     } else {
+      // Reset activeEvId ANTES de cargar para que cargarEvidencias auto-seleccione correctamente
+      state.setActiveEvId(null);
       setActiveAccordionId(id);
       state.cargarDetalle(id);
     }
@@ -105,66 +200,107 @@ export const MisActividadesMobileScreen: React.FC<MisActividadesMobileScreenProp
   // Lógica de carga de archivo recibida desde EvidenciaCaptureSheet
   const handleFileCaptured = async (file: any, fileName: string) => {
     if (!cargarSoporteAct || !cargarSoporteReq) return;
-    
-    // Si no tiene una evidencia operativa (carpeta activa), debemos crearla automáticamente
-    let evId = state.activeEv?.id;
-    if (!evId) {
-      try {
-        state.setEvNombre(cargarSoporteReq.nombre);
+    setIsUploading(true);
+    const accionId = cargarSoporteAct.accion.id;
+    const reqId = cargarSoporteReq.id;
+
+    try {
+      let evId = state.activeEv?.id;
+      if (!evId) {
+        const tiposPermitidos: string[] = cargarSoporteAct.accion?.tipos_evidencia_permitidos || [];
+        const evNombre = tiposPermitidos.length > 0 ? tiposPermitidos[0] : (cargarSoporteReq.nombre || 'Evidencia');
+        state.setEvNombre(evNombre);
         state.setEvDescripcion('Cargado desde app móvil');
         state.setEvFecha(new Date().toISOString().split('T')[0]);
-        
-        // Crear carpeta de evidencia
-        const res = await apiPostEvidencia(cargarSoporteAct.accion.id, cargarSoporteReq.nombre);
+        const res = await apiPostEvidencia(accionId, evNombre);
         evId = res.id;
-      } catch (err) {
-        alert('Error al inicializar carpeta de evidencia.');
-        return;
       }
-    }
 
-    if (evId) {
-      state.setSoporteFile(file);
-      state.setSoporteFileName(fileName);
-      state.setSoporteReqId(cargarSoporteReq.id);
-      
-      // Auto-guardar inmediatamente al capturar en móvil
-      await handleAutoGuardarSoporte(cargarSoporteAct.accion.id, evId, cargarSoporteReq.id, file, fileName);
+      if (evId) {
+        state.setSoporteFile(file);
+        state.setSoporteFileName(fileName);
+        state.setSoporteReqId(reqId);
+        await handleAutoGuardarSoporte(accionId, evId, reqId, file, fileName);
+        // Éxito: cerrar sheet y recargar UNA sola vez
+        setCargarSoporteAct(null);
+        setCargarSoporteReq(null);
+        showToast('¡Soporte subido correctamente! 🚀', 'success');
+        await state.cargarDetalle(accionId);
+      }
+    } catch (err: any) {
+      const d = err?.response?.data;
+      const msg = d?.error || d?.detail || (Array.isArray(d?.errores) ? d.errores.join(' · ') : null) || (err as any)?.message || 'Error al subir.';
+      showToast(msg, 'error');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleEnviarEvidenciaMobile = async (accionId: string, evId: string) => {
+    setSendingEv(true);
+    try {
+      await api.post(`/api/mis-actividades/${accionId}/evidencias-operativas/${evId}/enviar/`);
+      showToast('Evidencia enviada a revisión correctamente. ✈️', 'success');
+      await state.cargarDetalle(accionId);
+    } catch (e: any) {
+      const msg = e?.response?.data?.error || 'Error al enviar evidencia.';
+      showToast(msg, 'error');
+    } finally {
+      setSendingEv(false);
+      setShowConfirmSend(null);
     }
   };
 
   // Helper local para crear evidencia (carpeta) al vuelo en móvil
   const apiPostEvidencia = async (accionId: string, nombre: string) => {
-    const { api } = require('../../../../services/api');
     const res = await api.post(`/api/mis-actividades/${accionId}/evidencias-operativas/`, {
-      nombre: nombre.trim(),
+      nombre: nombre.trim() || 'Evidencia',
       descripcion: 'Registro rápido móvil',
       fecha_ejecucion: new Date().toISOString().split('T')[0],
       cantidad_ejecutada: 1,
     });
-    // Forzar actualización de listado de evidencias
-    await state.cargarDetalle(accionId);
+    // NO cargarDetalle aquí — se llama una sola vez al final del flujo
     return res.data.datos;
   };
 
-  // Auto-guardado de soporte inmediato para simplificar flujo de usuario en móvil
+  // Sube archivo a Cloudinary vía signed-upload y registra en backend
+  // NO gestiona estados UI — eso lo hace handleFileCaptured
   const handleAutoGuardarSoporte = async (accionId: string, evId: string, reqId: string, file: any, fileName: string) => {
-    const { api } = require('../../../../services/api');
-    try {
-      const fd = new FormData();
-      fd.append('archivo', file, fileName);
-      fd.append('requisito_id', reqId);
-      await api.post(`/api/mis-actividades/${accionId}/evidencias-operativas/${evId}/soportes/`, fd, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-      alert('Evidencia subida correctamente.');
-      setCargarSoporteAct(null);
-      setCargarSoporteReq(null);
-      await state.cargarDetalle(accionId);
-    } catch (e: any) {
-      const d = e?.response?.data;
-      alert(d?.error || d?.errores?.join(' · ') || 'Error al subir la evidencia.');
-    }
+    // 1. Obtener parámetros firmados del backend
+    const paramsRes = await api.get(
+      `/api/mis-actividades/${accionId}/evidencias-operativas/${evId}/upload-params/`
+    );
+    if (!paramsRes.data.ok) throw new Error(paramsRes.data.error || 'Error obteniendo parámetros.');
+    const { timestamp, signature, api_key, cloud_name, folder } = paramsRes.data.datos;
+
+    // 2. Upload directo a Cloudinary (no pasa por Railway)
+    const fd = new FormData();
+    fd.append('file', file, fileName);
+    fd.append('api_key', api_key);
+    fd.append('timestamp', String(timestamp));
+    fd.append('signature', signature);
+    fd.append('folder', folder);
+
+    const cloudRes = await fetch(
+      `https://api.cloudinary.com/v1_1/${cloud_name}/auto/upload`,
+      { method: 'POST', body: fd }
+    );
+    const cloudData = await cloudRes.json();
+    if (!cloudRes.ok) throw new Error(cloudData?.error?.message || 'Error subiendo a Cloudinary.');
+
+    // 3. Registrar soporte en backend con la URL del CDN
+    await api.post(
+      `/api/mis-actividades/${accionId}/evidencias-operativas/${evId}/soportes/`,
+      {
+        file_url: cloudData.secure_url,
+        file_name: fileName,
+        file_type: file.type || 'image/jpeg',
+        file_size: cloudData.bytes ?? file.size ?? 0,
+        requisito_id: reqId || undefined,
+      }
+    );
+    // Retorna la URL para posible preview inmediato
+    return cloudData.secure_url as string;
   };
 
   return (
@@ -194,6 +330,15 @@ export const MisActividadesMobileScreen: React.FC<MisActividadesMobileScreenProp
         })}
       </View>
 
+      {/* Filtro por Meta — dropdown compacto */}
+      {state.metasDisponibles && state.metasDisponibles.length > 1 && (
+        <MetaFilterDropdown
+          metas={state.metasDisponibles}
+          selected={state.selectedMeta ?? 'todas'}
+          onSelect={state.setSelectedMeta}
+        />
+      )}
+
       <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {/* Barra de Búsqueda */}
         <View style={styles.searchRow}>
@@ -207,9 +352,6 @@ export const MisActividadesMobileScreen: React.FC<MisActividadesMobileScreenProp
               placeholderTextColor="#94a3b8"
             />
           </View>
-          <TouchableOpacity style={styles.filterBtn}>
-            <Ionicons name="funnel-outline" size={16} color="#64748b" />
-          </TouchableOpacity>
         </View>
 
         {/* Tarjeta de Avance del Proyecto */}
@@ -266,6 +408,11 @@ export const MisActividadesMobileScreen: React.FC<MisActividadesMobileScreenProp
                     <Ionicons name="clipboard-outline" size={18} color="#fff" />
                   </View>
                   <View style={styles.accionMeta}>
+                    {(a.accion.meta_nombre || a.accion.componente_nombre) && (
+                      <Text style={{ fontFamily: typography.fontFamily, fontSize: 9, fontWeight: '700', color: '#7c3aed', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 2 }} numberOfLines={1}>
+                        {a.accion.meta_nombre}{a.accion.componente_nombre ? ` · ${a.accion.componente_nombre}` : ''}
+                      </Text>
+                    )}
                     <Text style={styles.accionName} numberOfLines={1}>{a.accion.nombre}</Text>
                     <Text style={styles.accionDesc} numberOfLines={1}>
                       {a.mi_asignacion?.roles?.join(' · ') || 'Miembro'}
@@ -312,12 +459,12 @@ export const MisActividadesMobileScreen: React.FC<MisActividadesMobileScreenProp
                         contentContainerStyle={{ gap: 8, paddingVertical: 4, marginBottom: 12 } as any}
                       >
                         {state.evidencias.map((ev: any) => {
-                          const active = state.activeEvId === ev.id;
+                          const active = String(state.activeEvId) === String(ev.id);
                           return (
                             <TouchableOpacity
                               key={ev.id}
                               style={[styles.folderPill, active && styles.folderPillActive]}
-                              onPress={() => state.setActiveEvId(ev.id)}
+                              onPress={() => state.setActiveEvId(String(ev.id))}
                               activeOpacity={0.7}
                             >
                               <Ionicons name="folder-open" size={12} color={active ? '#ffffff' : '#64748b'} />
@@ -340,134 +487,199 @@ export const MisActividadesMobileScreen: React.FC<MisActividadesMobileScreenProp
                       <ActivityIndicator size="small" color="#7c3aed" style={{ paddingVertical: 12 }} />
                     ) : (
                       <View style={{ gap: 14, marginTop: 4 }}>
-                        {state.requisitosEvidenciaActiva.map((req: any) => {
-                          const isActionCompleted = a.verificacion?.estado === 'completo';
-                          const isEditable = !isActionCompleted && (!state.activeEv || state.activeEv.estado === 'borrador' || state.activeEv.estado === 'reabierta');
-                          const canUpload = isEditable && (!req.max_archivos || req.archivos_cargados < req.max_archivos);
-
+                        {(() => {
+                          const currentFolder = state.evidencias.find((ev: any) => String(ev.id) === String(state.activeEvId)) ?? null;
                           return (
-                            <View key={req.id} style={{
-                              backgroundColor: '#f8fafc',
-                              borderRadius: 12,
-                              borderWidth: 1,
-                              borderColor: '#e2e8f0',
-                              padding: 12,
-                            }}>
-                              {/* Requirement Header */}
-                              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 } as any}>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 } as any}>
-                                  <Ionicons 
-                                    name={req.cumplido ? "checkmark-circle" : "ellipse-outline"} 
-                                    size={15} 
-                                    color={req.cumplido ? colors.success : '#94a3b8'} 
-                                  />
-                                  <Text style={{ fontFamily: typography.fontFamily, fontSize: 13, fontWeight: '700', color: '#1e293b' }}>
-                                    {req.nombre}
+                            <>
+                              {currentFolder?.grupo && (
+                                <View style={{ backgroundColor: '#eff6ff', borderRadius: 8, padding: 10, marginBottom: 4, borderWidth: 1, borderColor: '#bfdbfe' }}>
+                                  <Text style={{ fontSize: 12, color: '#1d4ed8', fontFamily: typography.fontFamily, fontWeight: '700' }}>
+                                    Grupo: {currentFolder.grupo.nombre} {currentFolder.grupo.codigo ? `(${currentFolder.grupo.codigo})` : ''}
                                   </Text>
-                                  {req.obligatorio && (
-                                    <Text style={{ fontSize: 9, color: '#ef4444', fontWeight: 'bold', backgroundColor: '#fef2f2', paddingHorizontal: 4, paddingVertical: 1, borderRadius: 4 }}>
-                                      Obligatorio
-                                    </Text>
-                                  )}
                                 </View>
-                                <Text style={{ fontFamily: typography.fontFamily, fontSize: 11, fontWeight: '700', color: req.cumplido ? colors.success : '#f59e0b' }}>
-                                  {req.archivos_cargados} de {req.max_archivos ?? req.min_archivos}
-                                </Text>
-                              </View>
+                              )}
+                              {state.requisitosEvidenciaActiva.map((req: any) => {
+                                // Solo el estado de la CARPETA bloquea la carga (borrador/reabierta = editable)
+                                // El estado de verificación de la acción NO bloquea subir a carpetas en borrador
+                                const isEditable = currentFolder?.estado === 'borrador' || currentFolder?.estado === 'reabierta';
+                                // canUpload: si hay carpeta editable y hay capacidad para más archivos
+                                const canUpload = isEditable && !!currentFolder && (!req.max_archivos || req.archivos_cargados < req.max_archivos);
 
-                              {/* Horizontal thumbnails scroll list + Upload dashed card */}
-                              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: 'row', alignItems: 'center', gap: 10 } as any}>
-                                {/* Uploaded files thumbnails */}
-                                {(req.evidencias || []).map((file: any) => (
-                                  <View key={file.id} style={{ position: 'relative' }}>
-                                    <TouchableOpacity
-                                      style={{
-                                        width: 80,
-                                        height: 80,
-                                        borderRadius: 8,
-                                        borderWidth: 1,
-                                        borderColor: '#cbd5e1',
-                                        backgroundColor: '#ffffff',
-                                        overflow: 'hidden',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                      }}
-                                      onPress={() => state.setPreviewSoporte(file)}
-                                    >
-                                      {file.file_type?.startsWith('image/') ? (
-                                        <Image source={{ uri: toUrl(file.file_url) }} style={{ width: '100%', height: '100%' }} />
-                                      ) : (
-                                        <View style={{ alignItems: 'center', justifyContent: 'center', padding: 4 }}>
-                                          <Ionicons name={fileIcon(file.file_type)} size={28} color={fileColor(file.file_type)} />
-                                          <Text style={{ fontSize: 8, fontFamily: typography.fontFamily, color: '#64748b', marginTop: 2, textAlign: 'center', width: 70 }} numberOfLines={1}>
-                                            {file.file_name}
+                                return (
+                                  <View key={req.id} style={{
+                                    backgroundColor: '#f8fafc',
+                                    borderRadius: 12,
+                                    borderWidth: 1,
+                                    borderColor: '#e2e8f0',
+                                    padding: 12,
+                                  }}>
+                                    {/* Requirement Header */}
+                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 } as any}>
+                                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 } as any}>
+                                        <Ionicons 
+                                          name={req.cumplido ? "checkmark-circle" : "ellipse-outline"} 
+                                          size={15} 
+                                          color={req.cumplido ? colors.success : '#94a3b8'} 
+                                        />
+                                        <Text style={{ fontFamily: typography.fontFamily, fontSize: 13, fontWeight: '700', color: '#1e293b' }}>
+                                          {req.nombre}
+                                        </Text>
+                                        {req.obligatorio && (
+                                          <Text style={{ fontSize: 9, color: '#ef4444', fontWeight: 'bold', backgroundColor: '#fef2f2', paddingHorizontal: 4, paddingVertical: 1, borderRadius: 4 }}>
+                                            Obligatorio
                                           </Text>
+                                        )}
+                                      </View>
+                                      <Text style={{ fontFamily: typography.fontFamily, fontSize: 11, fontWeight: '700', color: req.cumplido ? colors.success : '#f59e0b' }}>
+                                        {req.archivos_cargados} de {req.min_archivos}{req.max_archivos && req.max_archivos !== req.min_archivos ? ` (máx. ${req.max_archivos})` : ''}
+                                      </Text>
+                                    </View>
+
+                                    {/* Horizontal thumbnails scroll list + Upload dashed card */}
+                                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: 'row', alignItems: 'center', gap: 10 } as any}>
+                                      {/* Uploaded files thumbnails */}
+                                      {(req.evidencias || []).map((file: any) => (
+                                        <View key={file.id} style={{ position: 'relative' }}>
+                                          <TouchableOpacity
+                                            style={{
+                                              width: 80,
+                                              height: 80,
+                                              borderRadius: 8,
+                                              borderWidth: 1,
+                                              borderColor: '#cbd5e1',
+                                              backgroundColor: '#ffffff',
+                                              overflow: 'hidden',
+                                              alignItems: 'center',
+                                              justifyContent: 'center',
+                                            }}
+                                            onPress={() => state.setPreviewSoporte(file)}
+                                          >
+                                            {file.file_type?.startsWith('image/') ? (
+                                              <Image 
+                                                source={{ uri: cloudinaryThumb(file.file_url) }} 
+                                                style={{ width: '100%', height: '100%' }}
+                                                resizeMode="cover"
+                                              />
+                                            ) : (
+                                              <View style={{ alignItems: 'center', justifyContent: 'center', padding: 4 }}>
+                                                <Ionicons name={fileIcon(file.file_type)} size={28} color={fileColor(file.file_type)} />
+                                                <Text style={{ fontSize: 8, fontFamily: typography.fontFamily, color: '#64748b', marginTop: 2, textAlign: 'center', width: 70 }} numberOfLines={1}>
+                                                  {file.file_name}
+                                                </Text>
+                                              </View>
+                                            )}
+                                          </TouchableOpacity>
+
+                                          {/* Inline Delete Button on thumbnail */}
+                                          {isEditable && (
+                                            <TouchableOpacity
+                                              style={{
+                                                position: 'absolute',
+                                                top: -4,
+                                                right: -4,
+                                                width: 20,
+                                                height: 20,
+                                                borderRadius: 10,
+                                                backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                borderWidth: 1,
+                                                borderColor: '#ef4444',
+                                              }}
+                                              onPress={async () => {
+                                                if (confirm('¿Estás seguro de eliminar este soporte?')) {
+                                                  try {
+                                                    await state.handleDeleteSoporte(file.id);
+                                                    showToast('Soporte eliminado correctamente.', 'info');
+                                                  } catch (err) {
+                                                    showToast('Error al eliminar.', 'error');
+                                                  }
+                                                }
+                                              }}
+                                            >
+                                              <Ionicons name="close-circle" size={14} color="#ef4444" />
+                                            </TouchableOpacity>
+                                          )}
                                         </View>
+                                      ))}
+
+                                      {/* Tocar para subir (always visible if capacity & editable) */}
+                                      {canUpload && (
+                                        <TouchableOpacity
+                                          style={{
+                                            width: 80,
+                                            height: 80,
+                                            borderRadius: 8,
+                                            borderWidth: 1.5,
+                                            borderColor: '#cbd5e1',
+                                            borderStyle: 'dashed',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            backgroundColor: '#ffffff',
+                                          }}
+                                          onPress={() => {
+                                            setCargarSoporteAct(a);
+                                            setCargarSoporteReq(req);
+                                          }}
+                                        >
+                                          <Ionicons name="camera-outline" size={24} color="#7c3aed" />
+                                          <Text style={{ fontSize: 9, fontFamily: typography.fontFamily, color: '#7c3aed', marginTop: 2, fontWeight: '700' }}>
+                                            Subir foto
+                                          </Text>
+                                        </TouchableOpacity>
                                       )}
-                                    </TouchableOpacity>
-
-                                    {/* Inline Delete Button on thumbnail */}
-                                    {isEditable && (
-                                      <TouchableOpacity
-                                        style={{
-                                          position: 'absolute',
-                                          top: -4,
-                                          right: -4,
-                                          width: 20,
-                                          height: 20,
-                                          borderRadius: 10,
-                                          backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                                          alignItems: 'center',
-                                          justifyContent: 'center',
-                                          borderWidth: 1,
-                                          borderColor: '#ef4444',
-                                        }}
-                                        onPress={async () => {
-                                          if (confirm('¿Estás seguro de eliminar este soporte?')) {
-                                            try {
-                                              await state.handleDeleteSoporte(file.id);
-                                              alert('Soporte eliminado correctamente.');
-                                            } catch (err) {
-                                              alert('Error al eliminar.');
-                                            }
-                                          }
-                                        }}
-                                      >
-                                        <Ionicons name="close-circle" size={14} color="#ef4444" />
-                                      </TouchableOpacity>
-                                    )}
+                                    </ScrollView>
                                   </View>
-                                ))}
+                                );
+                              })}
 
-                                {/* Tocar para subir (always visible if capacity & editable) */}
-                                {canUpload && (
+                              {/* Botón Enviar Evidencia a Revisión en Móvil */}
+                              {!!currentFolder && (currentFolder.estado === 'borrador' || currentFolder.estado === 'reabierta') && (
+                                <View style={{ marginTop: 6, gap: 10 }}>
                                   <TouchableOpacity
                                     style={{
-                                      width: 80,
-                                      height: 80,
-                                      borderRadius: 8,
-                                      borderWidth: 1.5,
-                                      borderColor: '#cbd5e1',
-                                      borderStyle: 'dashed',
+                                      backgroundColor: '#7c3aed',
+                                      paddingVertical: 12,
+                                      borderRadius: 10,
                                       alignItems: 'center',
                                       justifyContent: 'center',
-                                      backgroundColor: '#ffffff',
+                                      flexDirection: 'row',
+                                      gap: 8,
+                                      opacity: state.requisitosEvidenciaActiva.filter((r: any) => r.obligatorio && !r.cumplido).length > 0 ? 0.5 : 1
                                     }}
+                                    disabled={state.requisitosEvidenciaActiva.filter((r: any) => r.obligatorio && !r.cumplido).length > 0}
                                     onPress={() => {
-                                      setCargarSoporteAct(a);
-                                      setCargarSoporteReq(req);
+                                      setShowConfirmSend({ accionId: a.accion.id, evId: currentFolder.id });
                                     }}
                                   >
-                                    <Ionicons name="camera-outline" size={24} color="#7c3aed" />
-                                    <Text style={{ fontSize: 9, fontFamily: typography.fontFamily, color: '#7c3aed', marginTop: 2, fontWeight: '700' }}>
-                                      Subir foto
+                                    <Ionicons name="send" size={16} color="#ffffff" />
+                                    <Text style={{ fontFamily: typography.fontFamily, fontSize: 13, fontWeight: '700', color: '#ffffff' }}>
+                                      Enviar Evidencia a Revisión
                                     </Text>
                                   </TouchableOpacity>
-                                )}
-                              </ScrollView>
-                            </View>
+
+                                  {state.requisitosEvidenciaActiva.filter((r: any) => r.obligatorio && !r.cumplido).length > 0 && (
+                                    <View style={{
+                                      flexDirection: 'row',
+                                      alignItems: 'center',
+                                      gap: 6,
+                                      backgroundColor: '#fff7ed',
+                                      borderRadius: 8,
+                                      padding: 10,
+                                      borderWidth: 1,
+                                      borderColor: '#ffedd5',
+                                    }}>
+                                      <Ionicons name="alert-circle" size={16} color="#ea580c" />
+                                      <Text style={{ fontFamily: typography.fontFamily, fontSize: 10, color: '#c2410c', flex: 1, lineHeight: 14 }}>
+                                        Para enviar esta evidencia a revisión, debes completar primero todos los requisitos obligatorios configurados.
+                                      </Text>
+                                    </View>
+                                  )}
+                                </View>
+                              )}
+                            </>
                           );
-                        })}
+                        })()}
                       </View>
                     )}
                   </View>
@@ -478,27 +690,185 @@ export const MisActividadesMobileScreen: React.FC<MisActividadesMobileScreenProp
         )}
       </ScrollView>
 
+      {/* Toast Notificación Customizada (Reemplaza alerts nativos del navegador) */}
+      {!!toast && (
+        <View style={{
+          position: 'absolute',
+          top: 70,
+          left: 16,
+          right: 16,
+          backgroundColor: toast.type === 'success' ? '#f0fdf4' : toast.type === 'error' ? '#fef2f2' : '#f0f9ff',
+          borderWidth: 1.5,
+          borderColor: toast.type === 'success' ? '#bbf7d0' : toast.type === 'error' ? '#fecaca' : '#bae6fd',
+          borderRadius: 12,
+          paddingHorizontal: 16,
+          paddingVertical: 12,
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 10,
+          zIndex: 9999,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 4,
+          elevation: 4,
+        }}>
+          <Ionicons 
+            name={toast.type === 'success' ? 'checkmark-circle' : toast.type === 'error' ? 'alert-circle' : 'information-circle'} 
+            size={20} 
+            color={toast.type === 'success' ? '#15803d' : toast.type === 'error' ? '#b91c1c' : '#0369a1'} 
+          />
+          <Text style={{
+            fontFamily: typography.fontFamily,
+            fontSize: 12,
+            fontWeight: '600',
+            color: toast.type === 'success' ? '#166534' : toast.type === 'error' ? '#991b1b' : '#075985',
+            flex: 1,
+          }}>
+            {toast.message}
+          </Text>
+        </View>
+      )}
+
+      {/* Modal Premium de Confirmación de Envío a Revisión */}
+      {!!showConfirmSend && (
+        <Modal visible={true} transparent animationType="fade" onRequestClose={() => setShowConfirmSend(null)}>
+          <View style={{
+            flex: 1,
+            backgroundColor: 'rgba(15, 23, 42, 0.4)',
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: 24,
+          }}>
+            <View style={{
+              width: 320,
+              backgroundColor: '#ffffff',
+              borderRadius: 16,
+              padding: 20,
+              alignItems: 'center',
+              shadowColor: '#090d16',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.12,
+              shadowRadius: 12,
+              elevation: 6,
+            }}>
+              <View style={{
+                width: 44,
+                height: 44,
+                borderRadius: 22,
+                backgroundColor: '#fff7ed',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginBottom: 12,
+                borderWidth: 1,
+                borderColor: '#ffedd5',
+              }}>
+                <Ionicons name="paper-plane" size={20} color="#ea580c" />
+              </View>
+
+              <Text style={{
+                fontFamily: typography.fontFamily,
+                fontSize: 15,
+                fontWeight: '700',
+                color: '#0f172a',
+                textAlign: 'center',
+                marginBottom: 6,
+              }}>
+                ¿Enviar evidencia a revisión?
+              </Text>
+
+              <Text style={{
+                fontFamily: typography.fontFamily,
+                fontSize: 11,
+                color: '#64748b',
+                textAlign: 'center',
+                lineHeight: 16,
+                marginBottom: 20,
+              }}>
+                Una vez enviada, la evidencia quedará bloqueada. No podrás subir ni eliminar ningún soporte de archivo.
+              </Text>
+
+              {sendingEv ? (
+                <ActivityIndicator size="small" color="#7c3aed" />
+              ) : (
+                <View style={{ flexDirection: 'row', gap: 10, width: '100%' } as any}>
+                  <TouchableOpacity
+                    style={{
+                      flex: 1,
+                      paddingVertical: 10,
+                      borderRadius: 8,
+                      borderWidth: 1,
+                      borderColor: '#e2e8f0',
+                      alignItems: 'center',
+                      backgroundColor: '#ffffff',
+                    }}
+                    onPress={() => setShowConfirmSend(null)}
+                  >
+                    <Text style={{ fontFamily: typography.fontFamily, fontSize: 12, fontWeight: '600', color: '#64748b' }}>
+                      Cancelar
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={{
+                      flex: 1,
+                      paddingVertical: 10,
+                      borderRadius: 8,
+                      backgroundColor: '#7c3aed',
+                      alignItems: 'center',
+                    }}
+                    onPress={() => {
+                      handleEnviarEvidenciaMobile(showConfirmSend.accionId, showConfirmSend.evId);
+                    }}
+                  >
+                    <Text style={{ fontFamily: typography.fontFamily, fontSize: 12, fontWeight: '600', color: '#ffffff' }}>
+                      Sí, enviar
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+          </View>
+        </Modal>
+      )}
+
       {/* Hoja/Modal de Carga de Soporte al capturar/hacer clic */}
       {!!cargarSoporteReq && (
         <View style={styles.sheetOverlay}>
           <View style={styles.sheetContent}>
-            <View style={styles.sheetHeader}>
-              <Text style={styles.sheetTitle}>Subir Soporte</Text>
-              <Text style={styles.sheetSubtitle}>{cargarSoporteReq.nombre}</Text>
-            </View>
-            <EvidenciaCaptureSheet 
-              allowedTypes={cargarSoporteReq.tipos_archivo_permitidos}
-              onFileCaptured={handleFileCaptured}
-            />
-            <TouchableOpacity 
-              style={styles.sheetCloseBtn}
-              onPress={() => {
-                setCargarSoporteAct(null);
-                setCargarSoporteReq(null);
-              }}
-            >
-              <Text style={styles.sheetCloseTxt}>Cancelar</Text>
-            </TouchableOpacity>
+            {isUploading ? (
+              // Spinner de carga — reemplaza los botones mientras sube
+              <View style={{ paddingVertical: 44, paddingHorizontal: 24, alignItems: 'center' }}>
+                <ActivityIndicator size="large" color="#7c3aed" />
+                <Text style={{ color: '#7c3aed', marginTop: 18, fontSize: 15, fontFamily: typography.fontFamily, fontWeight: '700' }}>
+                  Subiendo evidencia...
+                </Text>
+                <Text style={{ color: colors.textSecondary, marginTop: 8, fontSize: 12, fontFamily: typography.fontFamily, textAlign: 'center' }}>
+                  Por favor espera, no cierres la pantalla.
+                </Text>
+              </View>
+            ) : (
+              // Botones normales de captura
+              <>
+                <View style={styles.sheetHeader}>
+                  <Text style={styles.sheetTitle}>Subir Soporte</Text>
+                  <Text style={styles.sheetSubtitle}>{cargarSoporteReq.nombre}</Text>
+                </View>
+                <EvidenciaCaptureSheet 
+                  allowedTypes={cargarSoporteReq.tipos_archivo_permitidos}
+                  onFileCaptured={handleFileCaptured}
+                />
+                <TouchableOpacity 
+                  style={styles.sheetCloseBtn}
+                  onPress={() => {
+                    setCargarSoporteAct(null);
+                    setCargarSoporteReq(null);
+                  }}
+                >
+                  <Text style={styles.sheetCloseTxt}>Cancelar</Text>
+                </TouchableOpacity>
+              </>
+            )}
           </View>
         </View>
       )}
@@ -514,54 +884,74 @@ export const MisActividadesMobileScreen: React.FC<MisActividadesMobileScreenProp
 
             {(() => {
               const tipos: string[] = state.selectedAct?.accion?.tipos_evidencia_permitidos ?? [];
+              const unidad = state.selectedAct?.accion?.unidad_medida || 'unidades';
               if (tipos.length === 0) {
+                // Sin tipos: nombre y cantidad ya auto-poblados en openEvModal
                 return (
-                  <View style={{ backgroundColor: '#fef3c7', borderRadius: 8, padding: 12, marginBottom: spacing.sm }}>
-                    <Text style={{ fontSize: 12, color: '#92400e', fontFamily: typography.fontFamily }}>
-                      El coordinador aún no ha definido los tipos de evidencia para esta acción. Solicita que los configure antes de registrar.
+                  <View style={{ marginBottom: spacing.sm, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <View style={{
+                      backgroundColor: '#f5f3ff', borderRadius: 10,
+                      paddingHorizontal: 14, paddingVertical: 10,
+                      borderWidth: 1.5, borderColor: '#c4b5fd',
+                    }}>
+                      <Text style={{
+                        fontSize: 13, color: '#7c3aed', fontWeight: '700',
+                        fontFamily: typography.fontFamily,
+                      }}>
+                        ✓ 1 {unidad}
+                      </Text>
+                    </View>
+                    <Text style={{ fontSize: 12, color: '#64748b', flex: 1, fontFamily: typography.fontFamily }}>
+                      Se registrará 1 ejecución
                     </Text>
                   </View>
                 );
               }
+              // Con tipos configurados: chips seleccionables
               return (
                 <View style={{ marginBottom: spacing.sm }}>
-                  <Text style={styles.labelField}>Tipo de evidencia *</Text>
+                  <Text style={styles.labelField}>Selecciona el tipo de evidencia *</Text>
                   <ScrollView horizontal showsHorizontalScrollIndicator={false}
                     contentContainerStyle={{ gap: 8, paddingVertical: 4 } as any}>
-                    {tipos.map((t: string) => (
-                      <TouchableOpacity key={t}
-                        style={{ paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10,
-                          borderWidth: 1.5,
-                          borderColor: state.evNombre === t ? '#7c3aed' : '#cbd5e1',
-                          backgroundColor: state.evNombre === t ? '#f5f3ff' : '#ffffff' }}
-                        onPress={() => state.setEvNombre(t)}>
-                        <Text style={{ fontSize: 12,
-                          color: state.evNombre === t ? '#7c3aed' : '#475569',
-                          fontWeight: state.evNombre === t ? '700' : '400',
-                          fontFamily: typography.fontFamily }}>
-                          {t}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
+                    {tipos.map((t: string) => {
+                      const selected = state.evNombre === t;
+                      return (
+                        <TouchableOpacity key={t}
+                          style={{
+                            paddingHorizontal: 14, paddingVertical: 10, borderRadius: 10,
+                            borderWidth: 1.5,
+                            borderColor: selected ? '#7c3aed' : '#cbd5e1',
+                            backgroundColor: selected ? '#f5f3ff' : '#ffffff',
+                          }}
+                          onPress={() => {
+                            state.setEvNombre(t);
+                            state.setEvCantidad('1');
+                          }}>
+                          <Text style={{
+                            fontSize: 13,
+                            color: selected ? '#7c3aed' : '#475569',
+                            fontWeight: selected ? '700' : '400',
+                            fontFamily: typography.fontFamily,
+                          }}>
+                            {selected ? `✓ 1 ${t}` : `1 ${t}`}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
                   </ScrollView>
                 </View>
               );
             })()}
 
-            <Text style={styles.labelField}>¿A cuánto equivale esta entrega/evidencia? *</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: spacing.md }}>
-              <TextInput
-                style={[styles.textInputField, { flex: 1, marginTop: 4 }]}
-                value={state.evCantidad}
-                onChangeText={state.setEvCantidad}
-                placeholder="Ej. 1, 2.5, 10"
-                keyboardType="numeric"
-                placeholderTextColor="#94a3b8"
+
+            {state.selectedAct?.accion?.requiere_grupos && (
+              <ActionGroupSearchSelect
+                accionId={state.selectedAct.accion.id}
+                selectedGrupoId={state.evGrupoId}
+                onSelectGrupo={(g) => state.setEvGrupoId(g ? g.id : '')}
+                error={null}
               />
-              <Text style={{ fontFamily: typography.fontFamily, fontSize: 14, color: '#334155', fontWeight: '700', marginTop: 4 }}>
-                {state.selectedAct?.accion?.unidad_medida || 'unidades'}
-              </Text>
-            </View>
+            )}
 
             <Text style={styles.labelField}>Descripción / Bitácora</Text>
             <TextInput
@@ -644,9 +1034,9 @@ export const MisActividadesMobileScreen: React.FC<MisActividadesMobileScreenProp
             {!!state.evModalErr && <ErrorMessage message={state.evModalErr} />}
 
             <TouchableOpacity 
-              style={[styles.sheetSubmitBtn, (!state.evNombre || !state.evCantidad || (state.selectedAct?.accion?.tipos_evidencia_permitidos ?? []).length === 0) && { opacity: 0.5 }]}
+              style={[styles.sheetSubmitBtn, (!state.evNombre || !state.evCantidad || (state.selectedAct?.accion?.requiere_grupos && !state.evGrupoId)) && { opacity: 0.5 }]}
               onPress={state.handleCreateEvidencia}
-              disabled={state.evModalSaving || !state.evNombre || !state.evCantidad || (state.selectedAct?.accion?.tipos_evidencia_permitidos ?? []).length === 0}
+              disabled={state.evModalSaving || !state.evNombre || !state.evCantidad || (state.selectedAct?.accion?.requiere_grupos && !state.evGrupoId)}
             >
               <Text style={styles.sheetSubmitTxt}>
                 {state.evModalSaving ? 'Creando...' : 'Crear Evidencia'}

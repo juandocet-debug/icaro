@@ -13,7 +13,7 @@ from modulos.acciones.aplicacion.CrearGrupoAccionUseCase import CrearGrupoAccion
 from modulos.acciones.aplicacion.ActualizarGrupoAccionUseCase import ActualizarGrupoAccionUseCase
 from modulos.acciones.aplicacion.ListarGruposAccionUseCase import ListarGruposAccionUseCase
 from modulos.acciones.aplicacion.DesactivarGrupoAccionUseCase import DesactivarGrupoAccionUseCase
-from modulos.acciones.infraestructura.models import AccionGrupoModel
+from modulos.acciones.infraestructura.models import AccionGrupoModel, AccionModel, AsignacionResponsableAccionModel
 
 def _audit(request, action_name: str, model_name: str, object_id: str, payload: dict):
     try:
@@ -48,12 +48,38 @@ class AccionGrupoListCreateController(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, accion_id):
+        """
+        Lista los grupos de una acción.
+        Acceso permitido a:
+          - Gestores con permiso 'acciones.ver'
+          - Profesionales de carga con asignación activa en la acción
+        """
+        # Verificar que la acción existe
+        try:
+            accion = AccionModel.objects.get(pk=accion_id)
+        except AccionModel.DoesNotExist:
+            return Response({'ok': False, 'error': 'Acción no encontrada.'}, status=404)
+
+        # Intentar acceso por rol (gestor/coordinador)
+        tiene_acceso = False
         try:
             check_action_only_access(accion_id, request.user)
+            tiene_acceso = True
+        except PermissionError:
+            pass
         except ValueError as e:
             return Response({'ok': False, 'error': str(e)}, status=404)
-        except PermissionError as e:
-            return Response({'ok': False, 'error': str(e)}, status=403)
+
+        # Fallback: usuario con asignación activa en la acción (profesional de carga)
+        if not tiene_acceso:
+            tiene_acceso = AsignacionResponsableAccionModel.objects.filter(
+                accion_id=accion_id,
+                usuario=request.user,
+                activo=True
+            ).exists()
+
+        if not tiene_acceso:
+            return Response({'ok': False, 'error': 'No tienes acceso a los grupos de esta acción.'}, status=403)
 
         q = request.query_params.get('q', '')
         activo_param = request.query_params.get('activo')

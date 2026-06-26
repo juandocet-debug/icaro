@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, TextInput, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../../../shared/constants/colors';
 import { typography } from '../../../../shared/constants/typography';
 import { spacing } from '../../../../shared/constants/spacing';
 import { styles } from './MisActividadesStyles';
+import { generateEvidenciasPDF } from '../utils/pdf/generatePDF';
 
 const estadoColor = (e: string) => {
   switch (e) {
@@ -31,8 +32,36 @@ const estadoLabel = (e: string) => {
 export const EvidenciasGrid = ({
   filteredEvidencias, setActiveEvId, setPreviewSoporte, openEvModal, selectedAct,
   evQ, setEvQ, evFechaDesde, setEvFechaDesde, evFechaHasta, setEvFechaHasta,
+  proyectoNombre,
 }: any) => {
   const evidencias = filteredEvidencias;
+  const [pdfLoading, setPdfLoading] = useState(false);
+  const [pdfMsg, setPdfMsg]         = useState<string | null>(null);
+
+  const handleDownloadPDF = async () => {
+    if (Platform.OS !== 'web') {
+      setPdfMsg('El PDF solo está disponible en la versión web.');
+      setTimeout(() => setPdfMsg(null), 3000);
+      return;
+    }
+    if (!filteredEvidencias?.length) {
+      setPdfMsg('No hay evidencias para exportar.');
+      setTimeout(() => setPdfMsg(null), 3000);
+      return;
+    }
+    setPdfLoading(true);
+    setPdfMsg('Generando PDF...');
+    const err = await generateEvidenciasPDF({
+      proyectoNombre:    proyectoNombre || 'Proyecto',
+      metaNombre:        selectedAct?.accion?.meta_nombre || '',
+      componenteNombre:  selectedAct?.accion?.componente_nombre || '',
+      accionNombre:      selectedAct?.accion?.nombre || '',
+      evidencias:        filteredEvidencias,
+    });
+    setPdfLoading(false);
+    setPdfMsg(err ?? '✅ PDF listo — revisa la ventana de impresión');
+    setTimeout(() => setPdfMsg(null), 4000);
+  };
 
   const CARD_COLORS = [
     { bg: '#FF6B6B', iconBg: 'rgba(255,255,255,0.2)' },
@@ -69,10 +98,17 @@ export const EvidenciasGrid = ({
           <Text style={styles.sectionTitle}>Evidencias Operativas (Clases / Sesiones)</Text>
           <Text style={styles.sectionSub}>Registra evidencias para cada ejecución de esta acción.</Text>
         </View>
-        <TouchableOpacity style={gridStyles.btnPdf} onPress={() => {}}>
-          <Ionicons name="document-text-outline" size={15} color={colors.primary} />
-          <Text style={gridStyles.btnPdfTxt}>Descargar PDF</Text>
+        <TouchableOpacity style={gridStyles.btnPdf} onPress={handleDownloadPDF} disabled={pdfLoading}>
+          {pdfLoading
+            ? <Ionicons name="hourglass-outline" size={15} color={colors.primary} />
+            : <Ionicons name="document-text-outline" size={15} color={colors.primary} />}
+          <Text style={gridStyles.btnPdfTxt}>{pdfLoading ? 'Generando...' : 'Descargar PDF'}</Text>
         </TouchableOpacity>
+        {!!pdfMsg && (
+          <View style={gridStyles.pdfToast}>
+            <Text style={gridStyles.pdfToastTxt}>{pdfMsg}</Text>
+          </View>
+        )}
       </View>
 
       {/* Filtros activos */}
@@ -173,6 +209,8 @@ const gridStyles = {
   dateInput:  { fontSize: 12, color: colors.textPrimary, border: 'none', outline: 'none', backgroundColor: 'transparent', fontFamily: typography.fontFamily, paddingLeft: 6 } as any,
   dateInputNative: { fontSize: 12, color: colors.textPrimary, minWidth: 90 } as any,
   dateSep:    { fontSize: 12, color: colors.textSecondary },
-  btnPdf:     { flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 7, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: colors.primary, backgroundColor: `${colors.primary}08` } as any,
-  btnPdfTxt:  { fontSize: 12, color: colors.primary, fontWeight: '600' as any },
+  btnPdf:      { flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 7, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: colors.primary, backgroundColor: `${colors.primary}08` } as any,
+  btnPdfTxt:   { fontSize: 12, color: colors.primary, fontWeight: '600' as any },
+  pdfToast:    { position: 'absolute' as any, bottom: -32, right: 0, backgroundColor: '#1e293b', borderRadius: 6, paddingHorizontal: 10, paddingVertical: 5, zIndex: 100 } as any,
+  pdfToastTxt: { fontSize: 11, color: '#fff', fontFamily: typography.fontFamily } as any,
 };

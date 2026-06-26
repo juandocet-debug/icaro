@@ -20,8 +20,10 @@ export class AxiosAuthRepository implements AuthRepositoryPort {
 
   async refreshToken(refresh: string): Promise<AuthTokens> {
     try {
-      const response = await api.post<AuthTokens>('/api/auth/token/refresh/', {
-        refresh,
+      // Si refresh está vacío (caso web con cookie HTTP-Only), no lo incluimos en el body
+      const body = refresh ? { refresh } : {};
+      const response = await api.post<AuthTokens>('/api/auth/token/refresh/', body, {
+        withCredentials: true,
       });
       return response.data;
     } catch (error: any) {

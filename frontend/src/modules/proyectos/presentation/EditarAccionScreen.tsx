@@ -22,6 +22,8 @@ import { typography } from '../../../shared/constants/typography';
 import { useIsMobile } from '../../../shared/hooks/useIsMobile';
 import { useEditarAccionForm } from './hooks/useEditarAccionForm';
 import { UNIDADES_SUGERIDAS, TIPOS_MIME, PLANTILLAS } from './hooks/useAccionForm';
+import { useAccess } from '../../auth/presentation/useAccess';
+import { ActionGroupsManager } from './components/groups/ActionGroupsManager';
 
 // ── DateField ─────────────────────────────────────────────────────────────────
 const DateField: React.FC<{
@@ -85,7 +87,7 @@ export const EditarAccionScreen: React.FC<Props> = ({ proyectoId, componenteId, 
     nombre, setNombre, descripcion, setDescripcion,
     unidad, setUnidad, proyeccion, setProyeccion,
     startDate, setStartDate, endDate, setEndDate,
-    requisitos, tiposEvidencia, tipoEvInput, setTipoEvInput,
+    requisitos, requiereGrupos, setRequiereGrupos, tiposEvidencia, tipoEvInput, setTipoEvInput,
     saving, error, loadingData,
     asignados, opcionesAsignables, selectedUserId, setSelectedUserId,
     tipoAsig, setTipoAsig,
@@ -94,6 +96,9 @@ export const EditarAccionScreen: React.FC<Props> = ({ proyectoId, componenteId, 
     addTipoEvidencia, removeTipoEvidencia,
     handleGuardar,
   } = useEditarAccionForm(componenteId, accionId);
+
+  const { canInProject } = useAccess();
+  const canAsignarResponsables = canInProject('acciones.asignar_responsables', proyectoId ?? '');
 
   return (
     <AppShell scrollable={false} style={s.shell}>
@@ -167,6 +172,28 @@ export const EditarAccionScreen: React.FC<Props> = ({ proyectoId, componenteId, 
                   <DateField label="Fecha inicio" value={startDate} onChange={setStartDate} placeholder="AAAA-MM-DD" />
                   <DateField label="Fecha fin" value={endDate} onChange={setEndDate} placeholder="AAAA-MM-DD" />
                 </View>
+
+                {/* Requiere Grupos Switch */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: colors.border, pt: spacing.md, marginTop: spacing.md, paddingTop: spacing.md }}>
+                  <View style={{ flex: 1, marginRight: spacing.md }}>
+                    <Text style={{ fontFamily: typography.fontFamily, fontSize: typography.sizes.sm, color: colors.textPrimary, fontWeight: '700' }}>
+                      Esta acción requiere grupos
+                    </Text>
+                    <Text style={{ fontFamily: typography.fontFamily, fontSize: 12, color: colors.textSecondary, marginTop: 2 }}>
+                      Si se activa, el profesional de carga deberá seleccionar a qué grupo pertenece cada evidencia.
+                    </Text>
+                  </View>
+                  <Switch
+                    value={requiereGrupos}
+                    onValueChange={setRequiereGrupos}
+                    trackColor={{ false: '#d1d5db', true: '#3b82f6' }}
+                    thumbColor={requiereGrupos ? '#ffffff' : '#f4f3f4'}
+                  />
+                </View>
+
+                {requiereGrupos && accionId && (
+                  <ActionGroupsManager accionId={accionId} />
+                )}
               </View>
 
               {/* Tipos de Evidencia */}
@@ -202,7 +229,8 @@ export const EditarAccionScreen: React.FC<Props> = ({ proyectoId, componenteId, 
 
             {/* ── Columna Derecha ── */}
             <View style={s.column}>
-              {/* Responsables */}
+              {/* Responsables — solo si tiene permiso */}
+              {canAsignarResponsables && (
               <View style={[s.card, { zIndex: 10, position: 'relative' }]}>
                 <SectionHeader icon="people" title="RESPONSABLES" subtitle="Asigna responsables y apoyos" />
                 <View style={s.typeSelector}>
@@ -254,6 +282,7 @@ export const EditarAccionScreen: React.FC<Props> = ({ proyectoId, componenteId, 
                   </View>
                 )}
               </View>
+              )}
 
               {/* Requisitos */}
               <View style={s.card}>

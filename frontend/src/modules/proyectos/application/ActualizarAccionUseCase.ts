@@ -12,6 +12,7 @@ export class ActualizarAccionUseCase {
     tiposEvidencia?: string[];
     startDate?: string | null;
     endDate?: string | null;
+    requiereGrupos?: boolean;
   }): Promise<Accion> {
     return this.repositorio.actualizarAccion(compId, accionId, datos);
   }

@@ -184,11 +184,11 @@ export const UploadActionsPanel: React.FC<UploadActionsPanelProps> = ({
       <Button
         label="Enviar Evidencia a Revisión"
         onPress={() => setShowConfirmSend(true)}
-        disabled={reqsCompletadosActiveEv < requisitosEvidenciaActiva.length}
+        disabled={requisitosEvidenciaActiva.filter((r: any) => r.obligatorio && !r.cumplido).length > 0}
         style={{ backgroundColor: colors.primary, marginTop: 16 }}
       />
 
-      {reqsCompletadosActiveEv < requisitosEvidenciaActiva.length && (
+      {requisitosEvidenciaActiva.filter((r: any) => r.obligatorio && !r.cumplido).length > 0 && (
         <View style={{
           flexDirection: 'row',
           alignItems: 'center',
@@ -208,7 +208,7 @@ export const UploadActionsPanel: React.FC<UploadActionsPanelProps> = ({
             flex: 1,
             lineHeight: 14,
           }}>
-            Para enviar, completa todos los requisitos obligatorios a la izquierda (tienes {reqsCompletadosActiveEv} de {requisitosEvidenciaActiva.length} completados).
+            Para enviar, completa los requisitos obligatorios: faltan {requisitosEvidenciaActiva.filter((r: any) => r.obligatorio && !r.cumplido).length} de {requisitosEvidenciaActiva.filter((r: any) => r.obligatorio).length} obligatorios.
           </Text>
         </View>
       )}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, ScrollView, TouchableOpacity, Platform } from 'react-native';
+import { View, Text, ActivityIndicator, ScrollView, TouchableOpacity, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { AppShell } from '../../../shared/components/AppShell';
@@ -15,6 +15,8 @@ import { Meta } from '../domain/Meta';
 import { Componente } from '../domain/Componente';
 import { Accion } from '../domain/Accion';
 import { useIsMobile } from '../../../shared/hooks/useIsMobile';
+import { useAccess } from '../../auth/presentation/useAccess';
+import { styles } from './ProyectoMapaScreen.styles';
 
 interface Props {
   proyectoId: string;
@@ -41,9 +43,17 @@ const getDiasRestantes = (endDateStr?: string | null) => {
 };
 
 export const ProyectoMapaScreen: React.FC<Props> = ({ proyectoId }) => {
+  const { accessProfile, canInProject, isLoading: accessLoading } = useAccess();
   const isMobile = useIsMobile();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const isSuperAdmin = accessProfile?.esSuperadministrador === true;
+  const canVerMetas = isSuperAdmin || 
+    canInProject('metas.ver', proyectoId) || 
+    (accessProfile?.asignaciones?.some(
+      (a) => a.proyectoId === proyectoId && a.rolCodigo === 'coordinador_componente'
+    ) ?? false);
   
   // Hierarchical data
   const [treeData, setTreeData] = useState<TreeMeta[]>([]);
@@ -70,8 +80,8 @@ export const ProyectoMapaScreen: React.FC<Props> = ({ proyectoId }) => {
       // 3 requests en paralelo: mapa completo + evidencias + miembros (~300ms total)
       const [resMapa, resEv, resM] = await Promise.all([
         api.get<{ ok: boolean; datos: any[] }>(`/api/proyectos/${proyectoId}/mapa/`),
-        api.get<{ ok: boolean; datos: any[] }>(
-          `/api/evidencias/proyecto/${proyectoId}/evidencias-operativas-general/`
+        api.get<{ ok: boolean; count?: number; summary?: any; datos: any[] }>(
+          `/api/evidencias/proyecto/${proyectoId}/evidencias-operativas-general/?summary=1`
         ).catch(() => ({ data: { ok: false, datos: [] } })),
         api.get<{ ok: boolean; datos: any[] }>(
           `/api/miembros/proyecto/${proyectoId}/miembros/`
@@ -114,12 +124,12 @@ export const ProyectoMapaScreen: React.FC<Props> = ({ proyectoId }) => {
 
       // Evidencias KPIs
       if (resEv.data.ok) {
-        const evs = resEv.data.datos || [];
+        const summary = resEv.data.summary;
         setEvidenciaKpis({
-          aprobadas: evs.filter((e: any) => e.estado === 'aprobada').length,
-          revision: evs.filter((e: any) => e.estado === 'revision').length,
-          noAprobadas: evs.filter((e: any) => e.estado === 'no_aprobada' || e.estado === 'rechazada').length,
-          total: evs.length,
+          aprobadas: summary?.aprobadas ?? 0,
+          revision: summary?.revision ?? 0,
+          noAprobadas: summary?.pendientes ?? 0,
+          total: resEv.data.count ?? 0,
         });
       }
 
@@ -137,8 +147,14 @@ export const ProyectoMapaScreen: React.FC<Props> = ({ proyectoId }) => {
   };
 
   useEffect(() => {
+    if (accessLoading) return;
+    if (!accessProfile) return;
+    if (!canVerMetas) {
+      router.replace('/acceso-denegado');
+      return;
+    }
     cargarDatos();
-  }, [proyectoId]);
+  }, [proyectoId, accessLoading, accessProfile, canVerMetas]);
 
   // Toggle expand/collapse
   const toggleMeta = (metaId: string) => {
@@ -248,7 +264,7 @@ export const ProyectoMapaScreen: React.FC<Props> = ({ proyectoId }) => {
     return list.slice(0, 6);
   }, [treeData]);
 
-  if (loading) {
+  if (loading || accessLoading || !accessProfile) {
     return (
       <AppShell style={styles.shell}>
         <ActivityIndicator size="large" color="#a78bfa" style={styles.loader} />
@@ -716,664 +732,3 @@ export const ProyectoMapaScreen: React.FC<Props> = ({ proyectoId }) => {
     </AppShell>
   );
 };
-
-const styles = StyleSheet.create({
-  shell: { backgroundColor: '#090d16', alignSelf: 'stretch' as any },
-  loader: { marginTop: spacing.xxl },
-  btnRetry: { marginTop: spacing.lg, alignSelf: 'center' },
-  headerBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.lg,
-    paddingTop: spacing.xs,
-    width: '100%',
-  } as any,
-  headerLeft: {
-    flex: 1,
-  },
-  backBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginBottom: spacing.xs,
-  } as any,
-  backBtnText: {
-    fontFamily: typography.fontFamily,
-    fontSize: 11,
-    color: '#a78bfa',
-    fontWeight: '700',
-  },
-  title: {
-    fontFamily: typography.fontFamily,
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#ffffff',
-  },
-  subtitle: {
-    fontFamily: typography.fontFamily,
-    fontSize: 12,
-    color: '#6b7280',
-    marginTop: 2,
-  },
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  } as any,
-  dateSelector: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#111827',
-    borderWidth: 1,
-    borderColor: '#1f2937',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    gap: 6,
-  } as any,
-  dateText: {
-    fontFamily: typography.fontFamily,
-    fontSize: 11,
-    color: '#9ca3af',
-  },
-  exportBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#6d28d9',
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-  } as any,
-  exportBtnText: {
-    fontFamily: typography.fontFamily,
-    fontSize: 11,
-    color: '#ffffff',
-    fontWeight: '700',
-  },
-
-  // KPI CONTAINER
-  kpiContainer: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    marginBottom: spacing.lg,
-    width: '100%',
-  } as any,
-  kpiCard: {
-    flex: 1,
-    backgroundColor: '#111827',
-    borderColor: '#1f2937',
-    borderWidth: 1,
-    borderRadius: 16,
-    padding: spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-  } as any,
-  kpiLabel: {
-    fontFamily: typography.fontFamily,
-    fontSize: 9,
-    fontWeight: '800',
-    color: '#6b7280',
-    letterSpacing: 0.5,
-  },
-  kpiVal: {
-    fontFamily: typography.fontFamily,
-    fontSize: 26,
-    fontWeight: '800',
-    color: '#ffffff',
-    marginTop: 2,
-  },
-  kpiSub: {
-    fontFamily: typography.fontFamily,
-    fontSize: 11,
-    color: '#6b7280',
-    marginTop: 2,
-  },
-  iconBoxPurple: {
-    width: 44,
-    height: 44,
-    borderRadius: 10,
-    backgroundColor: '#6d28d925',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  structureRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 6,
-    gap: 8,
-  } as any,
-  structureVal: {
-    alignItems: 'center',
-  },
-  structNumber: {
-    fontFamily: typography.fontFamily,
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#ffffff',
-  },
-  structLabel: {
-    fontFamily: typography.fontFamily,
-    fontSize: 9,
-    color: '#6b7280',
-  },
-  structDivider: {
-    width: 1,
-    height: 18,
-    backgroundColor: '#1f2937',
-  },
-  donutContainer: {
-    position: 'relative',
-    width: 60,
-    height: 60,
-  },
-  donutTextContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  donutTextInner: {
-    fontFamily: typography.fontFamily,
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#ffffff',
-  },
-  semaforoList: {
-    marginTop: 4,
-    gap: 2,
-  },
-  semaforoItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  } as any,
-  dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  semaforoText: {
-    fontFamily: typography.fontFamily,
-    fontSize: 9,
-    fontWeight: '700',
-    color: '#ffffff',
-  },
-
-  // TWO COLUMN MAIN LAYOUT
-  mainLayout: {
-    flexDirection: 'row',
-    gap: spacing.lg,
-    alignItems: 'flex-start',
-    width: '100%',
-  } as any,
-  leftColumn: {
-    flex: 1.6,
-  },
-  rightColumn: {
-    flex: 1,
-  },
-
-  // MAPA CARD
-  mapCard: {
-    backgroundColor: '#111827',
-    borderColor: '#1f2937',
-    borderWidth: 1,
-    borderRadius: 20,
-  },
-  mapHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.md,
-    paddingBottom: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: '#1f2937',
-  } as any,
-  sectionTitle: {
-    fontFamily: typography.fontFamily,
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#ffffff',
-    letterSpacing: 0.5,
-  },
-  sectionSubtitle: {
-    fontFamily: typography.fontFamily,
-    fontSize: 11,
-    color: '#6b7280',
-    marginTop: 2,
-  },
-  mapSearchBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#1f2937',
-    borderRadius: 6,
-    paddingHorizontal: spacing.sm,
-    height: 32,
-    width: 180,
-    gap: spacing.xs,
-  } as any,
-  mapInputSearch: {
-    flex: 1,
-    borderWidth: 0,
-    fontFamily: typography.fontFamily,
-    fontSize: 11,
-    color: '#ffffff',
-    backgroundColor: 'transparent',
-    outlineStyle: 'none',
-  } as any,
-  actionOutlineBtn: {
-    borderWidth: 1,
-    borderColor: '#374151',
-    borderRadius: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  actionOutlineBtnText: {
-    fontFamily: typography.fontFamily,
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#9ca3af',
-  },
-  filterCard: {
-    marginBottom: spacing.lg,
-    backgroundColor: '#111827',
-    borderColor: '#1f2937',
-    borderWidth: 1,
-    borderRadius: 20,
-    width: '100%',
-  },
-
-  // TREE VIEW STRUCTURE
-  treeRoot: {
-    gap: spacing.sm,
-  },
-  emptyMap: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing.xl,
-    gap: spacing.xs,
-  } as any,
-  emptyMapText: {
-    fontFamily: typography.fontFamily,
-    fontSize: 12,
-    color: '#6b7280',
-    fontStyle: 'italic',
-  },
-  metaNode: {
-    backgroundColor: '#131926',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#1f2937',
-    marginBottom: spacing.xs,
-    overflow: 'hidden',
-  },
-  metaCardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: spacing.md,
-    backgroundColor: '#171e2e',
-  } as any,
-  metaHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    flex: 1,
-    marginRight: spacing.md,
-  } as any,
-  metaNumberBox: {
-    width: 26,
-    height: 26,
-    borderRadius: 6,
-    backgroundColor: '#5b21b6',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  metaNumberText: {
-    fontFamily: typography.fontFamily,
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#ffffff',
-  },
-  metaLevelTag: {
-    fontFamily: typography.fontFamily,
-    fontSize: 8,
-    fontWeight: '800',
-    color: '#a78bfa',
-    textTransform: 'uppercase',
-  },
-  metaTitleText: {
-    fontFamily: typography.fontFamily,
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#ffffff',
-  },
-  metaHeaderRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  } as any,
-  metaPct: {
-    fontFamily: typography.fontFamily,
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#a78bfa',
-  },
-  metaProgressBg: {
-    width: 50,
-    height: 4,
-    backgroundColor: '#1f2937',
-    borderRadius: 2,
-    overflow: 'hidden',
-  },
-  metaProgressFill: {
-    height: '100%',
-    backgroundColor: '#a78bfa',
-  },
-  metaStatsDesc: {
-    fontFamily: typography.fontFamily,
-    fontSize: 10,
-    color: '#6b7280',
-  },
-
-  // Meta Children (Líneas conectoras verticales)
-  metaChildren: {
-    paddingLeft: spacing.md,
-    paddingBottom: spacing.sm,
-    borderLeftWidth: 1,
-    borderLeftColor: '#374151',
-    marginLeft: spacing.lg + 2,
-    marginTop: spacing.xs,
-    gap: spacing.sm,
-  },
-
-  // Component Node
-  compNode: {
-    backgroundColor: '#161d2d',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#1f2937',
-    overflow: 'hidden',
-  },
-  compCardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: spacing.sm + 2,
-  } as any,
-  compHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    flex: 1,
-    marginRight: spacing.sm,
-  } as any,
-  compNumberBox: {
-    width: 24,
-    height: 24,
-    borderRadius: 6,
-    backgroundColor: '#1e3a8a',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  compNumberText: {
-    fontFamily: typography.fontFamily,
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#ffffff',
-  },
-  compLevelTag: {
-    fontFamily: typography.fontFamily,
-    fontSize: 8,
-    fontWeight: '800',
-    color: '#60a5fa',
-  },
-  compTitleText: {
-    fontFamily: typography.fontFamily,
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#ffffff',
-  },
-  compHeaderRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  } as any,
-  compPct: {
-    fontFamily: typography.fontFamily,
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#60a5fa',
-  },
-  compProgressBg: {
-    width: 40,
-    height: 4,
-    backgroundColor: '#1f2937',
-    borderRadius: 2,
-    overflow: 'hidden',
-  },
-  compProgressFill: {
-    height: '100%',
-    backgroundColor: '#60a5fa',
-  },
-  compStatsDesc: {
-    fontFamily: typography.fontFamily,
-    fontSize: 9,
-    color: '#6b7280',
-  },
-
-  // Component Children (Connects component actions)
-  compChildren: {
-    paddingLeft: spacing.md,
-    paddingBottom: spacing.xs,
-    borderLeftWidth: 1,
-    borderLeftColor: '#374151',
-    marginLeft: spacing.md + 4,
-    gap: 4,
-  },
-
-  // Action Node
-  actionNode: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#111827',
-    borderRadius: 6,
-    padding: spacing.sm,
-    borderWidth: 1,
-    borderColor: '#1f2937',
-    marginBottom: 4,
-  } as any,
-  actionLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    flex: 1,
-  } as any,
-  dotIndicator: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#6b7280',
-  },
-  actionIndex: {
-    fontFamily: typography.fontFamily,
-    fontSize: 10,
-    color: '#6b7280',
-  },
-  actionLevelTag: {
-    fontFamily: typography.fontFamily,
-    fontSize: 7,
-    fontWeight: '800',
-    color: '#9ca3af',
-  },
-  actionNameText: {
-    fontFamily: typography.fontFamily,
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#e5e7eb',
-    marginTop: 2,
-  },
-  actionRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  } as any,
-  actionPctText: {
-    fontFamily: typography.fontFamily,
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#e5e7eb',
-  },
-  actionProgressBg: {
-    width: 30,
-    height: 3,
-    backgroundColor: '#1f2937',
-    borderRadius: 1.5,
-    overflow: 'hidden',
-  },
-  actionProgressFill: {
-    height: '100%',
-    backgroundColor: '#3b82f6',
-  },
-  actionRespName: {
-    fontFamily: typography.fontFamily,
-    fontSize: 10,
-    color: '#9ca3af',
-  },
-  actionStatusBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  actionStatusBadgeText: {
-    fontFamily: typography.fontFamily,
-    fontSize: 8,
-    fontWeight: '800',
-  },
-
-  // SIDE CARDS
-  sideCard: {
-    backgroundColor: '#111827',
-    borderColor: '#1f2937',
-    borderWidth: 1,
-    borderRadius: 20,
-  },
-  sideCardTitle: {
-    fontFamily: typography.fontFamily,
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#ffffff',
-    letterSpacing: 0.5,
-  },
-  sideCardSub: {
-    fontFamily: typography.fontFamily,
-    fontSize: 10,
-    color: '#6b7280',
-    marginTop: 2,
-    marginBottom: spacing.md,
-  },
-
-  // BAR CHART
-  barChartContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-    height: 160,
-    paddingTop: spacing.md,
-  } as any,
-  barChartCol: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  barWrapper: {
-    width: 14,
-    height: 100,
-    backgroundColor: '#1f2937',
-    borderRadius: 7,
-    justifyContent: 'flex-end',
-    position: 'relative',
-  } as any,
-  barFill: {
-    width: '100%',
-    borderRadius: 7,
-  },
-  barValText: {
-    position: 'absolute',
-    top: -18,
-    left: -8,
-    right: -8,
-    textAlign: 'center',
-    fontFamily: typography.fontFamily,
-    fontSize: 9,
-    fontWeight: '800',
-    color: '#ffffff',
-  },
-  barLabel: {
-    fontFamily: typography.fontFamily,
-    fontSize: 9,
-    color: '#6b7280',
-    marginTop: 6,
-    width: '100%',
-    textAlign: 'center',
-  },
-
-  // RISK TABLE
-  riskList: {
-    gap: spacing.xs,
-  },
-  riskHeader: {
-    flexDirection: 'row',
-    borderBottomWidth: 1,
-    borderBottomColor: '#1f2937',
-    paddingVertical: 6,
-  } as any,
-  riskHeaderCell: {
-    flex: 1,
-    fontFamily: typography.fontFamily,
-    fontSize: 9,
-    fontWeight: '800',
-    color: '#6b7280',
-    textTransform: 'uppercase',
-  },
-  riskRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#111c2e',
-  } as any,
-  riskNameCell: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  } as any,
-  riskNameText: {
-    fontFamily: typography.fontFamily,
-    fontSize: 10,
-    color: '#d1d5db',
-  },
-  riskImpactText: {
-    flex: 1,
-    fontFamily: typography.fontFamily,
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  riskStateBadge: {
-    flex: 1,
-    backgroundColor: '#ef444420',
-    borderRadius: 4,
-    paddingVertical: 2,
-    alignItems: 'center',
-  },
-  riskStateText: {
-    fontFamily: typography.fontFamily,
-    fontSize: 9,
-    fontWeight: '800',
-    color: '#ef4444',
-  },
-});

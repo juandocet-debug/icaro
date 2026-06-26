@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, Platform, ScrollView, TouchableOpacity, Image, Modal } from 'react-native';
+import { View, Text, ActivityIndicator, Platform, ScrollView, TouchableOpacity, Image, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { AppShell } from '../../../shared/components/AppShell';
@@ -11,6 +11,9 @@ import { typography } from '../../../shared/constants/typography';
 import { api } from '../../../services/api';
 import { useAccess } from '../../auth/presentation/useAccess';
 import { SearchableSelect, SelectOption } from '../../../shared/components/SearchableSelect';
+import { styles, htmlInputStyle, htmlDateInputStyle, htmlSelectStyle, htmlPageSelectStyle, htmlTextAreaStyle } from './EvidenciasDashboardScreen.styles';
+import { generateEvidenciasPDF } from './utils/pdf/generatePDF';
+import { ActionGroupFilters } from './components/groups/ActionGroupFilters';
 
 
 interface Soporte {
@@ -42,6 +45,7 @@ interface EvidenciaGeneral {
     id: string;
     nombre: string;
     meta_nombre: string;
+    componente_nombre: string;
     requisitos?: Array<{
       id: string;
       nombre: string;
@@ -49,6 +53,11 @@ interface EvidenciaGeneral {
       min_archivos: number;
     }>;
   };
+  grupo?: {
+    id: string;
+    nombre: string;
+    codigo?: string | null;
+  } | null;
   soportes: Soporte[];
   created_at: string | null;
 }
@@ -59,9 +68,17 @@ interface Props {
 
 import { env } from '../../../config/env';
 
+const DASHBOARD_FETCH_LIMIT = 100;
+
 const toUrl = (url: string) => {
   const API_BASE = env.apiUrl;
   return url?.startsWith('http') ? url : `${API_BASE}${url}`;
+};
+
+const cloudinaryThumb = (url: string) => {
+  const fullUrl = toUrl(url);
+  if (!fullUrl.includes('res.cloudinary.com')) return fullUrl;
+  return fullUrl.replace('/upload/', '/upload/c_fill,w_240,h_240,q_auto,f_auto/');
 };
 
 const fileIcon = (t: string): any =>
@@ -92,9 +109,21 @@ export const EvidenciasDashboardScreen: React.FC<Props> = ({ proyectoId }) => {
   const [selectedEstado, setSelectedEstado] = useState('todos');
   const [selectedColaborador, setSelectedColaborador] = useState('todos');
   const [selectedMeta, setSelectedMeta] = useState('todos');
+  const [selectedComponente, setSelectedComponente] = useState('todos');
   const [selectedAccion, setSelectedAccion] = useState('todos');
+  const [selectedGrupoId, setSelectedGrupoId] = useState<string | null>(null);
   const [fechaDesde, setFechaDesde] = useState('');
   const [fechaHasta, setFechaHasta] = useState('');
+
+  const selectedAccionId = useMemo(() => {
+    if (selectedAccion === 'todos') return null;
+    const match = evidencias.find(ev => ev.accion?.nombre === selectedAccion);
+    return match?.accion?.id || null;
+  }, [selectedAccion, evidencias]);
+
+  useEffect(() => {
+    setSelectedGrupoId(null);
+  }, [selectedAccion]);
 
   // Filas expandidas (collapsible)
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
@@ -191,7 +220,9 @@ export const EvidenciasDashboardScreen: React.FC<Props> = ({ proyectoId }) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await api.get(`/api/evidencias/proyecto/${proyectoId}/evidencias-operativas-general/`);
+      const res = await api.get(
+        `/api/evidencias/proyecto/${proyectoId}/evidencias-operativas-general/?page=1&page_size=${DASHBOARD_FETCH_LIMIT}`
+      );
       if (res.data.ok) {
         setEvidencias(res.data.datos || []);
       } else {
@@ -211,7 +242,7 @@ export const EvidenciasDashboardScreen: React.FC<Props> = ({ proyectoId }) => {
   // Reset del paginado al cambiar filtros
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, selectedEstado, selectedColaborador, selectedMeta, selectedAccion, fechaDesde, fechaHasta, pageSize]);
+  }, [searchQuery, selectedEstado, selectedColaborador, selectedMeta, selectedComponente, selectedAccion, fechaDesde, fechaHasta, pageSize]);
 
   // Lista única de colaboradores (Filtro Inteligente)
   const colaboradores = useMemo(() => {
@@ -253,6 +284,7 @@ export const EvidenciasDashboardScreen: React.FC<Props> = ({ proyectoId }) => {
     evidencias.forEach(ev => {
       if (selectedEstado !== 'todos' && ev.estado !== selectedEstado) return;
       if (selectedColaborador !== 'todos' && ev.creada_por?.nombre !== selectedColaborador) return;
+      if (selectedComponente !== 'todos' && ev.accion?.componente_nombre !== selectedComponente) return;
       if (selectedAccion !== 'todos' && ev.accion?.nombre !== selectedAccion) return;
       if (fechaDesde && ev.fecha_ejecucion && ev.fecha_ejecucion < fechaDesde) return;
       if (fechaHasta && ev.fecha_ejecucion && ev.fecha_ejecucion > fechaHasta) return;
@@ -261,7 +293,24 @@ export const EvidenciasDashboardScreen: React.FC<Props> = ({ proyectoId }) => {
       }
     });
     return Array.from(names).sort();
-  }, [evidencias, selectedEstado, selectedColaborador, selectedAccion, fechaDesde, fechaHasta]);
+  }, [evidencias, selectedEstado, selectedColaborador, selectedComponente, selectedAccion, fechaDesde, fechaHasta]);
+
+  // Lista única de componentes (Filtro Inteligente — depende de Meta seleccionada)
+  const componentes = useMemo(() => {
+    const names = new Set<string>();
+    evidencias.forEach(ev => {
+      if (selectedEstado !== 'todos' && ev.estado !== selectedEstado) return;
+      if (selectedColaborador !== 'todos' && ev.creada_por?.nombre !== selectedColaborador) return;
+      if (selectedMeta !== 'todos' && ev.accion?.meta_nombre !== selectedMeta) return;
+      if (selectedAccion !== 'todos' && ev.accion?.nombre !== selectedAccion) return;
+      if (fechaDesde && ev.fecha_ejecucion && ev.fecha_ejecucion < fechaDesde) return;
+      if (fechaHasta && ev.fecha_ejecucion && ev.fecha_ejecucion > fechaHasta) return;
+      if (ev.accion?.componente_nombre) {
+        names.add(ev.accion.componente_nombre);
+      }
+    });
+    return Array.from(names).sort();
+  }, [evidencias, selectedEstado, selectedColaborador, selectedMeta, selectedAccion, fechaDesde, fechaHasta]);
 
   // Lista única de acciones/actividades (Filtro Inteligente)
   const acciones = useMemo(() => {
@@ -270,6 +319,7 @@ export const EvidenciasDashboardScreen: React.FC<Props> = ({ proyectoId }) => {
       if (selectedEstado !== 'todos' && ev.estado !== selectedEstado) return;
       if (selectedColaborador !== 'todos' && ev.creada_por?.nombre !== selectedColaborador) return;
       if (selectedMeta !== 'todos' && ev.accion?.meta_nombre !== selectedMeta) return;
+      if (selectedComponente !== 'todos' && ev.accion?.componente_nombre !== selectedComponente) return;
       if (fechaDesde && ev.fecha_ejecucion && ev.fecha_ejecucion < fechaDesde) return;
       if (fechaHasta && ev.fecha_ejecucion && ev.fecha_ejecucion > fechaHasta) return;
       if (ev.accion?.nombre) {
@@ -277,7 +327,7 @@ export const EvidenciasDashboardScreen: React.FC<Props> = ({ proyectoId }) => {
       }
     });
     return Array.from(names).sort();
-  }, [evidencias, selectedEstado, selectedColaborador, selectedMeta, fechaDesde, fechaHasta]);
+  }, [evidencias, selectedEstado, selectedColaborador, selectedMeta, selectedComponente, fechaDesde, fechaHasta]);
 
   // Lista única de estados disponibles (Filtro Inteligente)
   const estadosDisponibles = useMemo(() => {
@@ -320,12 +370,14 @@ export const EvidenciasDashboardScreen: React.FC<Props> = ({ proyectoId }) => {
       }
       if (selectedColaborador !== 'todos' && ev.creada_por?.nombre !== selectedColaborador) return false;
       if (selectedMeta !== 'todos' && ev.accion?.meta_nombre !== selectedMeta) return false;
+      if (selectedComponente !== 'todos' && ev.accion?.componente_nombre !== selectedComponente) return false;
       if (selectedAccion !== 'todos' && ev.accion?.nombre !== selectedAccion) return false;
+      if (selectedGrupoId && (!ev.grupo || ev.grupo.id !== selectedGrupoId)) return false;
       if (fechaDesde && ev.fecha_ejecucion && ev.fecha_ejecucion < fechaDesde) return false;
       if (fechaHasta && ev.fecha_ejecucion && ev.fecha_ejecucion > fechaHasta) return false;
       return true;
     });
-  }, [evidencias, searchQuery, selectedEstado, selectedColaborador, selectedMeta, selectedAccion, fechaDesde, fechaHasta]);
+  }, [evidencias, searchQuery, selectedEstado, selectedColaborador, selectedMeta, selectedComponente, selectedAccion, selectedGrupoId, fechaDesde, fechaHasta]);
 
   // Datos paginados
   const paginatedEvidencias = useMemo(() => {
@@ -458,13 +510,14 @@ export const EvidenciasDashboardScreen: React.FC<Props> = ({ proyectoId }) => {
     setSelectedEstado('todos');
     setSelectedColaborador('todos');
     setSelectedMeta('todos');
+    setSelectedComponente('todos');
     setSelectedAccion('todos');
+    setSelectedGrupoId(null);
     setFechaDesde('');
     setFechaHasta('');
   };
 
-  const getStatusBadgeStyle = (status: string) => {
-    switch (status) {
+  const getStatusBadgeStyle = (status: string) => { switch (status) {
       case 'aprobada': return { bg: '#e8f5e9', text: '#2e7d32' };
       case 'enviada': return { bg: '#fff8e1', text: '#f57f17' };
       case 'observada': return { bg: '#ffebee', text: '#c62828' };
@@ -473,86 +526,32 @@ export const EvidenciasDashboardScreen: React.FC<Props> = ({ proyectoId }) => {
     }
   };
 
-  const exportToPDF = () => {
-    if (Platform.OS !== 'web') {
-      alert('La exportación a PDF solo está disponible en web.');
-      return;
-    }
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
+  const [pdfLoading, setPdfLoading] = React.useState(false);
 
-    const rowsHtml = filteredEvidencias.map(ev => `
-      <tr>
-        <td>${ev.creada_por?.nombre || '-'}</td>
-        <td>${ev.accion?.meta_nombre || '-'}</td>
-        <td>${ev.accion?.nombre || '-'}</td>
-        <td><strong>${ev.nombre}</strong>${ev.descripcion ? `<br/><span style="color:#666;font-size:10px;">${ev.descripcion}</span>` : ''}</td>
-        <td style="text-align:center;">${ev.soportes.length}</td>
-        <td>
-          ${ev.soportes.map(s => `
-            <span style="display:block;font-size:10px;margin-bottom:2px;">📄 ${s.file_name}</span>
-          `).join('') || '-'}
-        </td>
-        <td>${ev.fecha_ejecucion || '-'}</td>
-        <td style="text-align:center;"><span class="badge badge-${ev.estado}">${ev.estado.toUpperCase()}</span></td>
-      </tr>
-    `).join('');
+  const exportToPDF = async () => {
+    if (!filteredEvidencias.length) return;
+    setPdfLoading(true);
 
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>Reporte de Evidencias</title>
-          <style>
-            body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1e293b; margin: 30px; }
-            .header-container { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #7c3aed; padding-bottom: 15px; margin-bottom: 20px; }
-            h1 { font-size: 20px; color: #7c3aed; margin: 0; }
-            table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-            th, td { border: 1px solid #e2e8f0; padding: 10px; text-align: left; font-size: 11px; vertical-align: top; }
-            th { background-color: #f8fafc; color: #475569; font-weight: 700; text-transform: uppercase; }
-            tr:nth-child(even) { background-color: #f8fafc; }
-            .badge { padding: 4px 8px; border-radius: 4px; font-size: 9px; font-weight: bold; }
-            .badge-aprobada { background-color: #dcfce7; color: #15803d; }
-            .badge-enviada { background-color: #fef3c7; color: #d97706; }
-            .badge-observada { background-color: #fee2e2; color: #b91c1c; }
-            .badge-reabierta { background-color: #e0e7ff; color: #4338ca; }
-            .badge-borrador { background-color: #f1f5f9; color: #475569; }
-          </style>
-        </head>
-        <body>
-          <div class="header-container">
-            <div>
-              <h1>Reporte Consolidado de Evidencias</h1>
-              <div style="font-size: 12px; margin-top: 4px; color: #64748b;">Proyecto ID: ${proyectoId}</div>
-            </div>
-            <div style="font-size: 11px; text-align: right; color: #64748b;">
-              <div>Fecha: ${new Date().toLocaleDateString()}</div>
-              <div>Registros: ${filteredEvidencias.length}</div>
-            </div>
-          </div>
-          <table>
-            <thead>
-              <tr>
-                <th>Colaborador</th>
-                <th>Meta / Objetivo</th>
-                <th>Acción / Actividad</th>
-                <th>Evidencia</th>
-                <th style="text-align:center;">Soportes</th>
-                <th>Soportes Detallados</th>
-                <th>Fecha Ejec.</th>
-                <th style="text-align:center;">Estado</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${rowsHtml}
-            </tbody>
-          </table>
-          <script>
-            window.onload = function() { window.print(); window.onafterprint = function() { window.close(); }; };
-          </script>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
+    // Nombre del proyecto desde las asignaciones del usuario
+    const proyectoNombre =
+      accessProfile?.asignaciones?.find((a) => a.proyectoId === proyectoId)?.proyectoNombre
+      ?? accessProfile?.asignaciones?.[0]?.proyectoNombre
+      ?? 'Proyecto';
+
+    // Meta, componente y acción: si el filtro tiene uno específico, úsalo
+    const metaNombre       = selectedMeta       !== 'todos' ? selectedMeta       : 'Todas las metas';
+    const componenteNombre = selectedComponente !== 'todos' ? selectedComponente : '';
+    const accionNombre     = selectedAccion     !== 'todos' ? selectedAccion     : 'Reporte General de Evidencias';
+
+    await generateEvidenciasPDF({
+      proyectoNombre,
+      metaNombre,
+      componenteNombre,
+      accionNombre,
+      evidencias: filteredEvidencias,
+    });
+
+    setPdfLoading(false);
   };
 
   if (loading) {
@@ -603,9 +602,9 @@ export const EvidenciasDashboardScreen: React.FC<Props> = ({ proyectoId }) => {
               <Text style={styles.cleanBtnText}>Limpiar filtros</Text>
             </TouchableOpacity>
             {Platform.OS === 'web' && (
-              <TouchableOpacity onPress={exportToPDF} style={styles.pdfBtn}>
-                <Ionicons name="download-outline" size={14} color="#ffffff" style={{ marginRight: 4 }} />
-                <Text style={styles.pdfBtnText}>Exportar PDF</Text>
+              <TouchableOpacity onPress={exportToPDF} style={[styles.pdfBtn, pdfLoading && { opacity: 0.6 } as any]} disabled={pdfLoading}>
+                <Ionicons name={pdfLoading ? 'hourglass-outline' : 'download-outline'} size={14} color="#ffffff" style={{ marginRight: 4 }} />
+                <Text style={styles.pdfBtnText}>{pdfLoading ? 'Generando...' : 'Exportar PDF'}</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -681,6 +680,26 @@ export const EvidenciasDashboardScreen: React.FC<Props> = ({ proyectoId }) => {
             </View>
           </View>
 
+          {/* Componente */}
+          <View style={[styles.filterGroup, { flex: 1.2, minWidth: 170 } as any]}>
+            <Text style={styles.filterLabel}>Componente</Text>
+            <View style={styles.selectWrapper}>
+              {Platform.OS === 'web' ? (
+                <select
+                  style={htmlSelectStyle}
+                  value={selectedComponente}
+                  onChange={(e: any) => setSelectedComponente(e.target.value)}
+                >
+                  <option value="todos">Todos los componentes</option>
+                  {componentes.map(name => (
+                    <option key={name} value={name}>{name}</option>
+                  ))}
+                </select>
+              ) : null}
+              <Ionicons name="chevron-down-outline" size={14} color={colors.textSecondary} style={styles.selectArrow} />
+            </View>
+          </View>
+
           {/* Acción / Actividad */}
           <View style={[styles.filterGroup, { flex: 1.2, minWidth: 180 } as any]}>
             <Text style={styles.filterLabel}>Acción / Actividad</Text>
@@ -730,6 +749,13 @@ export const EvidenciasDashboardScreen: React.FC<Props> = ({ proyectoId }) => {
             </View>
           </View>
         </View>
+        {selectedAccionId && (
+          <ActionGroupFilters
+            accionId={selectedAccionId}
+            selectedGrupoId={selectedGrupoId}
+            onSelectGrupoId={setSelectedGrupoId}
+          />
+        )}
       </Card>
 
       {/* Tabla Collapsible al 100% de Ancho */}
@@ -812,6 +838,11 @@ export const EvidenciasDashboardScreen: React.FC<Props> = ({ proyectoId }) => {
                           <Text style={{ fontFamily: typography.fontFamily, fontSize: 13, fontWeight: '700', color: colors.textPrimary }} numberOfLines={1}>
                             {ev.nombre}
                           </Text>
+                          {ev.grupo && (
+                            <Text style={{ fontFamily: typography.fontFamily, fontSize: 10, color: '#1d4ed8', fontWeight: '600', marginTop: 2 }}>
+                              Grupo: {ev.grupo.nombre} {ev.grupo.codigo ? `(${ev.grupo.codigo})` : ''}
+                            </Text>
+                          )}
                           {!!ev.descripcion && (
                             <Text style={{ fontFamily: typography.fontFamily, fontSize: 10, color: colors.textSecondary, marginTop: 2 }} numberOfLines={1}>
                               {ev.descripcion}
@@ -979,7 +1010,7 @@ export const EvidenciasDashboardScreen: React.FC<Props> = ({ proyectoId }) => {
                                               <View style={styles.soportePreview}>
                                                 {isImg ? (
                                                   <Image 
-                                                    source={{ uri: toUrl(s.file_url) }} 
+                                                    source={{ uri: cloudinaryThumb(s.file_url) }} 
                                                     style={styles.soporteThumbImage} 
                                                     resizeMode="cover"
                                                   />
@@ -1259,857 +1290,3 @@ export const EvidenciasDashboardScreen: React.FC<Props> = ({ proyectoId }) => {
   );
 
 };
-
-const htmlInputStyle: React.CSSProperties = {
-  width: '100%',
-  padding: '10px 14px 10px 38px',
-  borderRadius: '10px',
-  border: `1px solid ${colors.border}`,
-  fontSize: '13px',
-  fontFamily: typography.fontFamily,
-  backgroundColor: '#ffffff',
-  outline: 'none',
-  boxSizing: 'border-box',
-};
-
-const htmlDateInputStyle: React.CSSProperties = {
-  width: '100%',
-  padding: '10px 14px',
-  borderRadius: '10px',
-  border: `1px solid ${colors.border}`,
-  fontSize: '13px',
-  fontFamily: typography.fontFamily,
-  backgroundColor: '#ffffff',
-  outline: 'none',
-  boxSizing: 'border-box',
-};
-
-const htmlSelectStyle: React.CSSProperties = {
-  width: '100%',
-  padding: '10px 32px 10px 14px',
-  borderRadius: '10px',
-  border: `1px solid ${colors.border}`,
-  fontSize: '13px',
-  fontFamily: typography.fontFamily,
-  backgroundColor: '#ffffff',
-  outline: 'none',
-  boxSizing: 'border-box',
-  cursor: 'pointer',
-  appearance: 'none',
-};
-
-const htmlPageSelectStyle: React.CSSProperties = {
-  padding: '4px 8px',
-  borderRadius: '6px',
-  border: `1px solid ${colors.border}`,
-  fontSize: '12px',
-  fontFamily: typography.fontFamily,
-  backgroundColor: '#ffffff',
-  cursor: 'pointer',
-  marginLeft: '6px',
-};
-
-const htmlTextAreaStyle: React.CSSProperties = {
-  width: '100%',
-  minHeight: '80px',
-  padding: '12px',
-  borderRadius: '10px',
-  border: `1px solid ${colors.border}`,
-  fontSize: '13px',
-  fontFamily: typography.fontFamily,
-  backgroundColor: '#ffffff',
-  outline: 'none',
-  boxSizing: 'border-box',
-  resize: 'vertical',
-};
-
-
-const styles = StyleSheet.create({
-  shell: {
-    backgroundColor: '#f8fafc',
-    alignSelf: 'stretch' as any,
-  },
-  loader: {
-    marginTop: 64,
-  },
-  btnVolver: {
-    marginTop: spacing.md,
-    alignSelf: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    backgroundColor: colors.primary,
-    borderRadius: 8,
-  },
-  btnVolverText: {
-    color: '#ffffff',
-    fontFamily: typography.fontFamily,
-    fontWeight: 'bold',
-  },
-  header: {
-    marginBottom: spacing.md,
-    alignSelf: 'stretch' as any,
-  },
-  backButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    backgroundColor: '#f1f5f9',
-    alignSelf: 'flex-start',
-    marginBottom: spacing.xs,
-  } as any,
-  backButtonText: {
-    fontFamily: typography.fontFamily,
-    fontSize: typography.sizes.sm,
-    color: colors.primary,
-    fontWeight: '700',
-  },
-  headerTitleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  } as any,
-  title: {
-    fontFamily: typography.fontFamily,
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#0f172a',
-  },
-  subtitle: {
-    fontFamily: typography.fontFamily,
-    fontSize: typography.sizes.sm,
-    color: '#64748b',
-    marginTop: 2,
-  },
-  cleanBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: colors.primary,
-    paddingVertical: 7,
-    paddingHorizontal: 14,
-    borderRadius: 20,
-    backgroundColor: '#ffffff',
-  } as any,
-  cleanBtnText: {
-    fontFamily: typography.fontFamily,
-    fontSize: 12,
-    fontWeight: '700',
-    color: colors.primary,
-  },
-  pdfBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.primary,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 20,
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    elevation: 2,
-  } as any,
-  pdfBtnText: {
-    fontFamily: typography.fontFamily,
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#ffffff',
-  },
-  filtersCard: {
-    padding: spacing.md,
-    marginBottom: spacing.md,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    backgroundColor: '#ffffff',
-    alignSelf: 'stretch' as any,
-    width: '100%',
-    zIndex: 50,
-    position: 'relative',
-  },
-
-  filtersHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
-    paddingBottom: spacing.xs,
-  } as any,
-  filtersTitle: {
-    fontFamily: typography.fontFamily,
-    fontSize: typography.sizes.sm,
-    fontWeight: '700',
-    color: '#334155',
-  },
-  filtersGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-  } as any,
-  filterGroup: {
-    gap: 4,
-  } as any,
-  filterLabel: {
-    fontFamily: typography.fontFamily,
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#64748b',
-  },
-  inputWrapper: {
-    position: 'relative',
-    width: '100%',
-  },
-  inputIcon: {
-    position: 'absolute',
-    left: 12,
-    top: 11,
-    zIndex: 1,
-  },
-  selectWrapper: {
-    position: 'relative',
-    width: '100%',
-  },
-  selectArrow: {
-    position: 'absolute',
-    right: 12,
-    top: 12,
-    pointerEvents: 'none',
-  } as any,
-  tableCard: {
-    padding: 0,
-    borderRadius: 16,
-    overflow: 'hidden' as any,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    backgroundColor: '#ffffff',
-    alignSelf: 'stretch' as any,
-    width: '100%',
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    paddingVertical: 56,
-    gap: 8,
-  } as any,
-  emptyText: {
-    fontFamily: typography.fontFamily,
-    fontSize: typography.sizes.sm,
-    color: '#64748b',
-    fontStyle: 'italic',
-  },
-  tableContainer: {
-    width: '100%',
-  },
-  tableHeaderRow: {
-    flexDirection: 'row',
-    backgroundColor: '#f8fafc',
-    borderBottomWidth: 2,
-    borderBottomColor: '#e2e8f0',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    alignItems: 'center',
-  } as any,
-  th: {
-    fontFamily: typography.fontFamily,
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#475569',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  rowContainer: {
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
-  },
-  tableRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    backgroundColor: '#ffffff',
-  } as any,
-  tableRowActive: {
-    backgroundColor: 'rgba(108,85,201,0.02)',
-  },
-  arrowCol: {
-    width: 40,
-    justifyContent: 'center',
-    alignItems: 'flex-start',
-  } as any,
-  tdCol: {
-    justifyContent: 'center',
-  },
-  td: {
-    fontFamily: typography.fontFamily,
-    fontSize: 13,
-    color: '#334155',
-  },
-  avatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#e0e7ff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: colors.primary,
-    fontFamily: typography.fontFamily,
-  },
-  colabName: {
-    fontFamily: typography.fontFamily,
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#1e293b',
-  },
-  colabEmail: {
-    fontFamily: typography.fontFamily,
-    fontSize: 10,
-    color: '#64748b',
-    marginTop: 1,
-  },
-  countBadge: {
-    backgroundColor: 'rgba(108,85,201,0.1)',
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    minWidth: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  countBadgeText: {
-    fontFamily: typography.fontFamily,
-    fontSize: 11,
-    fontWeight: '700',
-    color: colors.primary,
-  },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  statusBadgeText: {
-    fontFamily: typography.fontFamily,
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 0.3,
-  },
-  reabrirBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: colors.primary,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-  } as any,
-  deleteBtn: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.error,
-    padding: 6,
-    borderRadius: 12,
-  } as any,
-  actionBtnText: {
-    fontFamily: typography.fontFamily,
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#ffffff',
-  },
-  // Collapsible inner drawer
-  expandedDrawer: {
-    backgroundColor: '#f8fafc',
-    padding: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#e2e8f0',
-    borderBottomWidth: 1,
-    borderBottomColor: '#cbd5e1',
-  },
-  drawerHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 12,
-  } as any,
-  drawerTitle: {
-    fontFamily: typography.fontFamily,
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#1e293b',
-  },
-  drawerCountBadge: {
-    backgroundColor: '#e2e8f0',
-    borderRadius: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  drawerCountBadgeText: {
-    fontFamily: typography.fontFamily,
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#475569',
-  },
-  soportesList: {
-    gap: 8,
-  } as any,
-  emptySoportesText: {
-    fontFamily: typography.fontFamily,
-    fontSize: 12,
-    color: '#94a3b8',
-    fontStyle: 'italic',
-  },
-  soporteRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#ffffff',
-    padding: 10,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  } as any,
-  soporteIconWrapper: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  soporteName: {
-    fontFamily: typography.fontFamily,
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#1e293b',
-  },
-  soporteMeta: {
-    fontFamily: typography.fontFamily,
-    fontSize: 10,
-    color: '#64748b',
-    marginTop: 2,
-  },
-  soporteActions: {
-    flexDirection: 'row',
-    gap: 6,
-  } as any,
-  soporteActionBtn: {
-    padding: 6,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    backgroundColor: '#f8fafc',
-  },
-  paginationRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    backgroundColor: '#f8fafc',
-    borderTopWidth: 1,
-    borderTopColor: '#e2e8f0',
-  } as any,
-  paginationText: {
-    fontFamily: typography.fontFamily,
-    fontSize: 12,
-    color: '#64748b',
-  },
-  pageSizeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  } as any,
-  pageSizeLabel: {
-    fontFamily: typography.fontFamily,
-    fontSize: 12,
-    color: '#64748b',
-  },
-  paginationButtons: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  } as any,
-  pageBtn: {
-    padding: 6,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#cbd5e1',
-    backgroundColor: '#ffffff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  pageBtnDisabled: {
-    backgroundColor: '#f1f5f9',
-    borderColor: '#e2e8f0',
-    opacity: 0.6,
-  },
-  pageNumberBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-    backgroundColor: '#e2e8f0',
-  },
-  pageNumberText: {
-    fontFamily: typography.fontFamily,
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#334155',
-  },
-  // Modal de Vista Previa
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.45)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
-  },
-  modalContent: {
-    width: '100%',
-    maxWidth: 620,
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    overflow: 'hidden' as any,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.15,
-    shadowRadius: 20,
-    elevation: 8,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
-  } as any,
-  modalTitle: {
-    fontFamily: typography.fontFamily,
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#0f172a',
-    flex: 1,
-  },
-  closeModalBtn: {
-    padding: 4,
-  },
-  modalBody: {
-    backgroundColor: '#f8fafc',
-    padding: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  imagePreviewContainer: {
-    width: '100%',
-    height: 380,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden' as any,
-    backgroundColor: '#f1f5f9',
-    borderRadius: 8,
-    position: 'relative',
-  },
-  zoomControls: {
-    position: 'absolute',
-    bottom: 12,
-    right: 12,
-    flexDirection: 'row',
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    borderRadius: 20,
-    padding: 4,
-    gap: 4,
-    borderWidth: 1,
-    borderColor: '#cbd5e1',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  } as any,
-  zoomBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#ffffff',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  zoomText: {
-    fontFamily: typography.fontFamily,
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#334155',
-    paddingHorizontal: 4,
-  },
-  nonImagePreview: {
-    width: '100%',
-    height: 380,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#f8fafc',
-  },
-  nonImageText: {
-    fontFamily: typography.fontFamily,
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#475569',
-    marginTop: 12,
-    textAlign: 'center',
-    paddingHorizontal: 24,
-  },
-  nonImageSubtext: {
-    fontFamily: typography.fontFamily,
-    fontSize: 11,
-    color: '#94a3b8',
-    marginTop: 4,
-  },
-  modalFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#f1f5f9',
-  } as any,
-  modalFooterMeta: {
-    fontFamily: typography.fontFamily,
-    fontSize: 11,
-    color: '#64748b',
-  },
-  modalFooterSize: {
-    fontFamily: typography.fontFamily,
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#475569',
-    marginTop: 2,
-  },
-  openTabBtn: {
-    backgroundColor: colors.primary,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 8,
-  },
-  openTabBtnText: {
-    fontFamily: typography.fontFamily,
-    fontSize: 12,
-    color: '#ffffff',
-    fontWeight: '700',
-  },
-  requisitosContainer: {
-    marginTop: 12,
-    gap: 16,
-  } as any,
-  requisitoGroup: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#cbd5e1',
-    padding: 12,
-  },
-  requisitoGroupHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
-    paddingBottom: 8,
-    marginBottom: 12,
-  } as any,
-  requisitoGroupTitle: {
-    fontFamily: typography.fontFamily,
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#1e293b',
-  },
-  requisitoGroupCount: {
-    fontFamily: typography.fontFamily,
-    fontSize: 11,
-    color: '#64748b',
-  },
-  soportesGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  } as any,
-  soporteGridItem: {
-    width: 100,
-    alignItems: 'center',
-    gap: 6,
-  } as any,
-  soportePreview: {
-    width: 100,
-    height: 100,
-    borderRadius: 8,
-    overflow: 'hidden' as any,
-    borderWidth: 1,
-    borderColor: '#cbd5e1',
-    position: 'relative',
-    backgroundColor: '#f8fafc',
-    alignItems: 'center',
-    justifyContent: 'center',
-  } as any,
-  soporteThumbImage: {
-    width: '100%',
-    height: '100%',
-  },
-  soporteHoverOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(15, 23, 42, 0.45)',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  } as any,
-  soporteHoverBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.4)',
-  },
-  soporteGridName: {
-    fontFamily: typography.fontFamily,
-    fontSize: 11,
-    color: '#334155',
-    textAlign: 'center',
-    width: '100%',
-  } as any,
-  reviewPanel: {
-    marginTop: 20,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#cbd5e1',
-  },
-  reviewPanelTitle: {
-    fontFamily: typography.fontFamily,
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#0f172a',
-    marginBottom: 8,
-  },
-  reviewCommentContainer: {
-    marginBottom: 12,
-  },
-  reviewLabel: {
-    fontFamily: typography.fontFamily,
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#475569',
-    marginBottom: 6,
-  },
-  reviewActionsRow: {
-    flexDirection: 'row',
-    gap: 12,
-  } as any,
-  reviewBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-  } as any,
-  reviewBtnAprobar: {
-    backgroundColor: '#10b981',
-  },
-  reviewBtnObservar: {
-    backgroundColor: '#f59e0b',
-  },
-  reviewBtnText: {
-    fontFamily: typography.fontFamily,
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#ffffff',
-  },
-  dialogOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.45)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
-  },
-  dialogContent: {
-    width: '100%',
-    maxWidth: 400,
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    overflow: 'hidden' as any,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.15,
-    shadowRadius: 20,
-    elevation: 8,
-  },
-  dialogHeader: {
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
-  } as any,
-  dialogTitle: {
-    fontFamily: typography.fontFamily,
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#0f172a',
-  },
-  dialogBody: {
-    padding: 20,
-    alignItems: 'stretch' as any,
-  } as any,
-  dialogMessage: {
-    fontFamily: typography.fontFamily,
-    fontSize: 13,
-    color: '#475569',
-    lineHeight: 18,
-  },
-  dialogFooter: {
-    flexDirection: 'row',
-    borderTopWidth: 1,
-    borderTopColor: '#f1f5f9',
-    padding: 12,
-    gap: 8,
-    justifyContent: 'flex-end',
-  } as any,
-  dialogBtn: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    minWidth: 80,
-    alignItems: 'center',
-  } as any,
-  dialogBtnConfirm: {
-    backgroundColor: colors.primary,
-  },
-  dialogBtnConfirmText: {
-    fontFamily: typography.fontFamily,
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#ffffff',
-  },
-  dialogBtnCancel: {
-    backgroundColor: '#f1f5f9',
-    borderWidth: 1,
-    borderColor: '#cbd5e1',
-  },
-  dialogBtnCancelText: {
-    fontFamily: typography.fontFamily,
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#475569',
-  },
-});
-

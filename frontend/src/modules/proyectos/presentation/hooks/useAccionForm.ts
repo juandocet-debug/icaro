@@ -46,6 +46,7 @@ export function useAccionForm(componenteId: string, proyectoId: string) {
   const [startDate,   setStartDate]   = useState('');
   const [endDate,     setEndDate]     = useState('');
   const [requisitos,  setRequisitos]  = useState<ReqDraft[]>([]);
+  const [requiereGrupos, setRequiereGrupos] = useState(false);
   const [tiposEvidencia, setTiposEvidencia] = useState<string[]>([]);
   const [tipoEvInput,    setTipoEvInput]    = useState('');
   const [saving,      setSaving]      = useState(false);
@@ -62,7 +63,7 @@ export function useAccionForm(componenteId: string, proyectoId: string) {
     setNombre(''); setDescripcion(''); setUnidad(''); setProyeccion('');
     setRequisitos([]); setTiposEvidencia([]); setTipoEvInput(''); setError(null);
     setSelectedUserId(''); setTipoAsig('responsable'); setSeleccionados([]);
-    setStartDate(''); setEndDate('');
+    setStartDate(''); setEndDate(''); setRequiereGrupos(false);
   };
 
   // Cargar miembros del proyecto
@@ -155,6 +156,7 @@ export function useAccionForm(componenteId: string, proyectoId: string) {
         tiposEvidencia: tiposEvidencia.length > 0 ? tiposEvidencia : undefined,
         startDate: startDate || null,
         endDate: endDate || null,
+        requiereGrupos,
       });
 
       const erroresAsignacion: string[] = [];
@@ -185,7 +187,7 @@ export function useAccionForm(componenteId: string, proyectoId: string) {
     nombre, setNombre, descripcion, setDescripcion,
     unidad, setUnidad, proyeccion, setProyeccion,
     startDate, setStartDate, endDate, setEndDate,
-    requisitos, tiposEvidencia, tipoEvInput, setTipoEvInput,
+    requisitos, requiereGrupos, setRequiereGrupos, tiposEvidencia, tipoEvInput, setTipoEvInput,
     saving, error,
     // Responsables
     miembros, loadingMiembros, selectedUserId, setSelectedUserId,

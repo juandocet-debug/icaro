@@ -156,6 +156,11 @@ export const EvidenciaDetailModal = ({
             Fecha ejecución: {activeEv.fecha_ejecucion} {activeEv.cantidad_ejecutada > 0 ? `· Cantidad: ${activeEv.cantidad_ejecutada}` : ''}
           </Text>
         )}
+        {activeEv.grupo && (
+          <Text style={[styles.activeEvMetaText, { color: colors.primary, fontWeight: '700', marginTop: 4 }]}>
+            Grupo: {activeEv.grupo.nombre} {activeEv.grupo.codigo ? `(${activeEv.grupo.codigo})` : ''}
+          </Text>
+        )}
         {!!activeEv.observacion_coordinador && (
           <View style={styles.activeEvObsBox}>
             <Text style={styles.activeEvObsTitle}>Observación de Coordinación:</Text>

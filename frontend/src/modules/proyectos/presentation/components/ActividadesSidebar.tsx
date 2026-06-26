@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, ScrollView, TextInput } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../../../shared/constants/colors';
+import { typography } from '../../../../shared/constants/typography';
 import { styles } from './MisActividadesStyles';
 
 const estadoColor = (e: string) => {
@@ -16,7 +17,8 @@ const estadoColor = (e: string) => {
 };
 
 export const ActividadesSidebar = ({
-  q, setQ, estado, setEstado, FILTROS, filteredActs, selectedAct, cargarDetalle
+  q, setQ, estado, setEstado, FILTROS, filteredActs, selectedAct, cargarDetalle,
+  selectedMeta, setSelectedMeta, metasDisponibles,
 }: any) => {
   const renderItem = (item: any) => {
     const act = item.accion;
@@ -35,6 +37,12 @@ export const ActividadesSidebar = ({
           <Ionicons name="clipboard-outline" size={16} color={sel ? '#fff' : colorAc} />
         </View>
         <View style={{ flex: 1 }}>
+          {/* Meta / Componente label */}
+          {act.meta_nombre && (
+            <Text style={[styles.listMeta, sel && { color: 'rgba(255,255,255,0.6)' }, { fontSize: 9, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 1 }]} numberOfLines={1}>
+              {act.meta_nombre}{act.componente_nombre ? ` · ${act.componente_nombre}` : ''}
+            </Text>
+          )}
           <Text style={[styles.listName, sel ? styles.listNameSel : styles.listNameUnsel]} numberOfLines={1}>
             {act.nombre}
           </Text>
@@ -81,7 +89,32 @@ export const ActividadesSidebar = ({
           )}
         </View>
 
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 12 }}>
+        {/* Filtro por Meta — desplegable compacto (solo si hay >1 meta) */}
+        {metasDisponibles && metasDisponibles.length > 1 && (
+          <View style={{ marginTop: 10 }}>
+            <select
+              value={selectedMeta ?? 'todas'}
+              onChange={(e: any) => setSelectedMeta(e.target.value)}
+              style={{
+                width: '100%', height: 32, borderRadius: 8,
+                border: `1px solid ${(selectedMeta && selectedMeta !== 'todas') ? colors.primary : colors.border}`,
+                backgroundColor: (selectedMeta && selectedMeta !== 'todas') ? `${colors.primary}12` : colors.surface,
+                color: (selectedMeta && selectedMeta !== 'todas') ? colors.primary : colors.textSecondary,
+                fontFamily: typography.fontFamily,
+                fontSize: 12, fontWeight: '500',
+                paddingLeft: 8, paddingRight: 4,
+                outline: 'none', cursor: 'pointer',
+              } as any}
+            >
+              <option value="todas">Todas las metas</option>
+              {metasDisponibles.map((m: string) => (
+                <option key={m} value={m}>{m}</option>
+              ))}
+            </select>
+          </View>
+        )}
+
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 10 }}>
           {FILTROS.map((f: any) => {
             const active = estado === f.id;
             return (

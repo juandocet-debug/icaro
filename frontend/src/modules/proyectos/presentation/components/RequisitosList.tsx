@@ -12,6 +12,16 @@ const toUrl = (url: string) => {
   return url?.startsWith('http') ? url : `${API_BASE}${url}`;
 };
 
+/** Genera URL de thumbnail Cloudinary 160x160 c_fill para carga rápida en grilla */
+const cloudinaryThumb = (url: string): string => {
+  if (!url) return url;
+  const fullUrl = toUrl(url);
+  // Solo transforma URLs de Cloudinary
+  if (!fullUrl.includes('res.cloudinary.com')) return fullUrl;
+  // Inserta transformaciones antes de /upload/
+  return fullUrl.replace('/upload/', '/upload/c_fill,w_160,h_160,q_auto,f_auto/');
+};
+
 const fileIcon = (t: string): any =>
   t?.startsWith('image/') ? 'image-outline'
   : t === 'application/pdf' ? 'document-text-outline'
@@ -97,7 +107,7 @@ export const RequisitosList: React.FC<RequisitosListProps> = ({
                   )}
                 </View>
                 <Text style={{ fontFamily: typography.fontFamily, fontSize: 11, fontWeight: '700', color: cumplido ? colors.success : '#f59e0b' }}>
-                  {req.archivos_cargados} de {req.max_archivos ?? req.min_archivos}
+                  {req.archivos_cargados} de {req.min_archivos}{req.max_archivos && req.max_archivos !== req.min_archivos ? ` (máx. ${req.max_archivos})` : ''}
                 </Text>
               </View>
 
@@ -127,7 +137,11 @@ export const RequisitosList: React.FC<RequisitosListProps> = ({
                       onPress={() => setPreviewSoporte(file)}
                     >
                       {file.file_type?.startsWith('image/') ? (
-                        <Image source={{ uri: toUrl(file.file_url) }} style={{ width: '100%', height: '100%' }} />
+                        <Image 
+                          source={{ uri: cloudinaryThumb(file.file_url) }} 
+                          style={{ width: '100%', height: '100%' }}
+                          resizeMode="cover"
+                        />
                       ) : (
                         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
                           <Ionicons name={fileIcon(file.file_type)} size={28} color={fileColor(file.file_type)} />
