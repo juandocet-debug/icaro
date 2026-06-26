@@ -40,28 +40,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       try {
         const tokens = await restoreSessionUseCase.ejecutar();
         if (tokens) {
-          // ── Fase 1: desbloquear la UI inmediatamente ──────────────────────
-          // El token es válido → el usuario está autenticado.
-          // No esperamos el perfil para mostrar la app.
+          const perfil = await obtenerPerfilUseCase.ejecutar();
           setIsAuthenticated(true);
-          setIsLoading(false);
-
-          // ── Fase 2: cargar el perfil en segundo plano (no bloquea) ────────
-          try {
-            const perfil = await obtenerPerfilUseCase.ejecutar();
-            setUserProfile(perfil);
-          } catch {
-            // Perfil no disponible temporalmente — la sesión sigue activa
-          }
-          return; // evitar el finally que volvería a setIsLoading(false)
+          setUserProfile(perfil);
         }
       } catch (e) {
         await tokenStorage.clearTokens();
         setIsAuthenticated(false);
         setUserProfile(null);
         console.error('Error al restaurar sesión activa o perfil', e);
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     };
     restoreSession();
   }, []);
