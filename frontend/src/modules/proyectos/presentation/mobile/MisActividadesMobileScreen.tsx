@@ -14,6 +14,76 @@ import { EvidenciaCaptureSheet } from '../EvidenciaCaptureSheet';
 import { ErrorMessage } from '../../../../shared/components/ErrorMessage';
 
 /** Dropdown compacto para filtrar por meta en móvil */
+const ProyectoFilterDropdown: React.FC<{
+  proyectos: Array<{ id: string; nombre: string }>;
+  selected: string;
+  onSelect: (v: string) => void;
+}> = ({ proyectos, selected, onSelect }) => {
+  const [open, setOpen] = useState(false);
+  const label = selected === 'todos' ? 'Proyecto: Todos' : `🏗 ${proyectos.find(p => p.id === selected)?.nombre ?? selected}`;
+  const hasFilter = selected !== 'todos';
+  return (
+    <>
+      <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}>
+        <TouchableOpacity
+          onPress={() => setOpen(true)}
+          style={{
+            flexDirection: 'row', alignItems: 'center', gap: 6,
+            backgroundColor: hasFilter ? '#ede9fe' : '#f8fafc',
+            borderWidth: 1, borderColor: hasFilter ? '#7c3aed' : '#e2e8f0',
+            borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6,
+            flex: 1,
+          }}
+        >
+          <Ionicons name="business-outline" size={13} color={hasFilter ? '#7c3aed' : '#64748b'} />
+          <Text style={{ flex: 1, fontFamily: typography.fontFamily, fontSize: 12, fontWeight: hasFilter ? '700' : '400', color: hasFilter ? '#7c3aed' : '#64748b' }} numberOfLines={1}>
+            {label}
+          </Text>
+          <Ionicons name="chevron-down" size={13} color={hasFilter ? '#7c3aed' : '#94a3b8'} />
+        </TouchableOpacity>
+        {hasFilter && (
+          <TouchableOpacity onPress={() => onSelect('todos')} style={{ marginLeft: 8, padding: 4 }}>
+            <Ionicons name="close-circle" size={18} color="#7c3aed" />
+          </TouchableOpacity>
+        )}
+      </View>
+      <Modal visible={open} transparent animationType="slide" onRequestClose={() => setOpen(false)}>
+        <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' }} activeOpacity={1} onPress={() => setOpen(false)} />
+        <View style={{ backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: 32, maxHeight: '60%' }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}>
+            <Text style={{ fontFamily: typography.fontFamily, fontSize: 15, fontWeight: '700', color: '#1e293b' }}>Filtrar por Proyecto</Text>
+            <TouchableOpacity onPress={() => setOpen(false)}>
+              <Ionicons name="close" size={22} color="#64748b" />
+            </TouchableOpacity>
+          </View>
+          <ScrollView>
+            {[{ id: 'todos', nombre: 'Todos los proyectos' }, ...proyectos].map((p) => {
+              const isActive = selected === p.id;
+              return (
+                <TouchableOpacity
+                  key={p.id}
+                  onPress={() => { onSelect(p.id); setOpen(false); }}
+                  style={{
+                    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+                    paddingHorizontal: 20, paddingVertical: 14,
+                    borderBottomWidth: 1, borderBottomColor: '#f8fafc',
+                    backgroundColor: isActive ? '#faf5ff' : '#fff',
+                  }}
+                >
+                  <Text style={{ fontFamily: typography.fontFamily, fontSize: 14, color: isActive ? '#7c3aed' : '#334155', fontWeight: isActive ? '700' : '400' }}>
+                    {p.nombre}
+                  </Text>
+                  {isActive && <Ionicons name="checkmark-circle" size={18} color="#7c3aed" />}
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+      </Modal>
+    </>
+  );
+};
+
 const MetaFilterDropdown: React.FC<{
   metas: string[];
   selected: string;
@@ -329,6 +399,18 @@ export const MisActividadesMobileScreen: React.FC<MisActividadesMobileScreenProp
           );
         })}
       </View>
+
+      {/* Filtro por Proyecto — solo si hay >1 proyecto */}
+      {state.proyectosDisponibles && state.proyectosDisponibles.length > 1 && (
+        <ProyectoFilterDropdown
+          proyectos={state.proyectosDisponibles}
+          selected={state.selectedProyectoId ?? 'todos'}
+          onSelect={(v: string) => {
+            state.setSelectedProyectoId(v);
+            state.setSelectedMeta('todas'); // reset meta
+          }}
+        />
+      )}
 
       {/* Filtro por Meta — dropdown compacto */}
       {state.metasDisponibles && state.metasDisponibles.length > 1 && (

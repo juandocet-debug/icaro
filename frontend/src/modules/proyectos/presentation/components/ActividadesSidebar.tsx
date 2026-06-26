@@ -19,6 +19,7 @@ const estadoColor = (e: string) => {
 export const ActividadesSidebar = ({
   q, setQ, estado, setEstado, FILTROS, filteredActs, selectedAct, cargarDetalle,
   selectedMeta, setSelectedMeta, metasDisponibles,
+  selectedProyectoId, setSelectedProyectoId, proyectosDisponibles,
 }: any) => {
   const renderItem = (item: any) => {
     const act = item.accion;
@@ -88,6 +89,34 @@ export const ActividadesSidebar = ({
             </TouchableOpacity>
           )}
         </View>
+
+        {/* Filtro por Proyecto — solo si hay >1 proyecto */}
+        {proyectosDisponibles && proyectosDisponibles.length > 1 && (
+          <View style={{ marginTop: 10 }}>
+            <select
+              value={selectedProyectoId ?? 'todos'}
+              onChange={(e: any) => {
+                setSelectedProyectoId(e.target.value);
+                setSelectedMeta('todas'); // reset meta al cambiar proyecto
+              }}
+              style={{
+                width: '100%', height: 32, borderRadius: 8,
+                border: `1px solid ${(selectedProyectoId && selectedProyectoId !== 'todos') ? '#7c3aed' : colors.border}`,
+                backgroundColor: (selectedProyectoId && selectedProyectoId !== 'todos') ? '#f5f3ff' : colors.surface,
+                color: (selectedProyectoId && selectedProyectoId !== 'todos') ? '#7c3aed' : colors.textSecondary,
+                fontFamily: typography.fontFamily,
+                fontSize: 12, fontWeight: '600',
+                paddingLeft: 8, paddingRight: 4,
+                outline: 'none', cursor: 'pointer',
+              } as any}
+            >
+              <option value="todos">📁 Todos los proyectos</option>
+              {proyectosDisponibles.map((p: any) => (
+                <option key={p.id} value={p.id}>{p.nombre}</option>
+              ))}
+            </select>
+          </View>
+        )}
 
         {/* Filtro por Meta — desplegable compacto (solo si hay >1 meta) */}
         {metasDisponibles && metasDisponibles.length > 1 && (

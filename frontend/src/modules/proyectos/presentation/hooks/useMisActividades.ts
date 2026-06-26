@@ -10,6 +10,7 @@ export const useMisActividades = (selectedAccionId?: string) => {
   const [q, setQ] = useState('');
   const [estado, setEstado] = useState<'todas' | 'pendientes' | 'completadas'>('todas');
   const [selectedMeta, setSelectedMeta] = useState<string>('todas');
+  const [selectedProyectoId, setSelectedProyectoId] = useState<string>('todos');
 
   // Detalle de actividad seleccionada
   const [selectedAct, setSelectedAct] = useState<any | null>(null);
@@ -133,8 +134,27 @@ export const useMisActividades = (selectedAccionId?: string) => {
     return Array.from(new Set(nombres)).sort();
   }, [todasActs]);
 
+  // Lista única de proyectos disponibles para filtro
+  const proyectosDisponibles = useMemo(() => {
+    const items: Array<{ id: string; nombre: string }> = [];
+    const seen = new Set<string>();
+    for (const a of todasActs) {
+      const pid = a.proyecto?.id;
+      const pnombre = a.proyecto?.nombre;
+      if (pid && pnombre && !seen.has(pid)) {
+        seen.add(pid);
+        items.push({ id: pid, nombre: pnombre });
+      }
+    }
+    return items.sort((a, b) => a.nombre.localeCompare(b.nombre));
+  }, [todasActs]);
+
   const filteredActs = useMemo(() => {
     let acts = todasActs;
+    // Filtro por proyecto
+    if (selectedProyectoId !== 'todos') {
+      acts = acts.filter(a => a.proyecto?.id === selectedProyectoId);
+    }
     // Filtro por meta
     if (selectedMeta !== 'todas') {
       acts = acts.filter(a => a.accion?.meta_nombre === selectedMeta);
@@ -143,7 +163,7 @@ export const useMisActividades = (selectedAccionId?: string) => {
     if (estado === 'completadas') acts = acts.filter(isComp);
     else if (estado === 'pendientes') acts = acts.filter(a => !isComp(a));
     return acts;
-  }, [todasActs, estado, selectedMeta]);
+  }, [todasActs, estado, selectedMeta, selectedProyectoId]);
 
   const FILTROS = [
     { id: 'todas', label: 'Todas', cnt: todasActs.length },
@@ -345,6 +365,7 @@ export const useMisActividades = (selectedAccionId?: string) => {
   return {
     todasActs, loading, error, q, setQ, estado, setEstado,
     selectedMeta, setSelectedMeta, metasDisponibles,
+    selectedProyectoId, setSelectedProyectoId, proyectosDisponibles,
     filteredActs, FILTROS,
     selectedAct, detailLoad, detailErr, cargarDetalle,
     evidencias, evidenciasLoad, activeEvId, setActiveEvId,

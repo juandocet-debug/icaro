@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, ActivityIndicator, Pressable, Platform } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, ActivityIndicator, Pressable, Modal } from 'react-native';
 import { useGroupSearch } from '../../hooks/useGroupSearch';
 import { ActionGroup } from '../../hooks/useActionGroups';
 

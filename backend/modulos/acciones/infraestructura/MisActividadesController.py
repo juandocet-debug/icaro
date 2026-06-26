@@ -254,7 +254,20 @@ def _serialize_actividad_detallada(accion, usuario, request=None, _ctx: dict | N
     puede_registrar_ejecucion = es_gestor or (tipo_asig == 'responsable')
     puede_subir_evidencia = es_gestor or tipo_asig in ('responsable', 'apoyo')
 
+    proyecto_nombre = ''
+    if _ctx:
+        proyecto_nombre = _ctx.get('proyecto_nombres', {}).get(proyecto_id, '')
+    else:
+        try:
+            proyecto_nombre = accion.component.project.name or ''
+        except Exception:
+            proyecto_nombre = ''
+
     return {
+        'proyecto': {
+            'id': proyecto_id,
+            'nombre': proyecto_nombre,
+        },
         'accion': {
             'id': str(accion.id),
             'nombre': accion.name,
@@ -317,6 +330,14 @@ class MisActividadesController(APIView):
             proyecto_ids = list({str(a.component.project_id) for a in items})
             comp_ids     = list({str(a.component_id) for a in items})
             ctx = _build_user_context(request.user, action_ids, proyecto_ids, componente_ids=comp_ids) if items else {}
+
+            # Pre-cargar nombres de proyectos (1 query extra, sin N+1)
+            if items:
+                from modulos.proyectos.infraestructura.models import ProyectoModel
+                ctx['proyecto_nombres'] = {
+                    str(p.id): p.name
+                    for p in ProyectoModel.objects.filter(id__in=proyecto_ids).only('id', 'name')
+                }
 
             return Response({
                 'ok': True,
