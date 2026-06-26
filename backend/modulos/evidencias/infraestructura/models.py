@@ -40,7 +40,7 @@ class EvidenciaActividadModel(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-    grupo = models.ForeignKey('acciones.AccionGrupoModel', null=True, blank=True, on_delete=models.PROTECT, related_name='evidencias_operativas')
+    grupo = models.ForeignKey('acciones.AccionGrupoModel', null=True, blank=True, on_delete=models.SET_NULL, related_name='evidencias_operativas')
 
     class Meta:
         app_label = 'evidencias'
