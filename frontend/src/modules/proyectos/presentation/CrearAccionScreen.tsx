@@ -82,6 +82,8 @@ export const CrearAccionScreen: React.FC<Props> = ({ componenteId, proyectoId })
     startDate, setStartDate, endDate, setEndDate,
     requisitos, requiereGrupos, setRequiereGrupos, tiposEvidencia, tipoEvInput, setTipoEvInput,
     saving, error,
+    gruposDraft, grupoNombre, setGrupoNombre, grupoCodigo, setGrupoCodigo,
+    addGrupoDraft, removeGrupoDraft,
     miembros, loadingMiembros, selectedUserId, setSelectedUserId,
     tipoAsig, setTipoAsig, seleccionados, opcionesMiembros,
     handleAgregarResponsable, handleQuitarResponsable,
@@ -183,7 +185,51 @@ export const CrearAccionScreen: React.FC<Props> = ({ componenteId, proyectoId })
               </View>
             </View>
 
-            {/* Tipos de Evidencia Operativa */}
+            {/* Panel de grupos — solo si requiereGrupos está activo */}
+            {requiereGrupos && (
+              <View style={s.card}>
+                <SectionHeader icon="people-circle" title="GRUPOS" subtitle="Define los grupos para esta acción. Se guardarán al crear la acción." />
+                <View style={{ flexDirection: 'row', gap: 8, marginBottom: 8 } as any}>
+                  <TextInput
+                    style={[s.tipoEvInput, { flex: 2 }]}
+                    value={grupoNombre}
+                    onChangeText={setGrupoNombre}
+                    placeholder="Nombre del grupo *"
+                    placeholderTextColor={colors.textSecondary}
+                    onSubmitEditing={addGrupoDraft}
+                  />
+                  <TextInput
+                    style={[s.tipoEvInput, { flex: 1 }]}
+                    value={grupoCodigo}
+                    onChangeText={setGrupoCodigo}
+                    placeholder="Código (opc.)"
+                    placeholderTextColor={colors.textSecondary}
+                  />
+                  <TouchableOpacity style={s.tipoEvAddBtn} onPress={addGrupoDraft}>
+                    <Ionicons name="add" size={18} color="#fff" />
+                  </TouchableOpacity>
+                </View>
+                {gruposDraft.length === 0 ? (
+                  <Text style={{ fontFamily: typography.fontFamily, fontSize: 12, color: colors.textSecondary, textAlign: 'center', paddingVertical: 12 }}>
+                    Aún no has agregado grupos. Agrega al menos uno.
+                  </Text>
+                ) : (
+                  <View style={{ gap: 6 } as any}>
+                    {gruposDraft.map(g => (
+                      <View key={g.id} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.background, borderRadius: 8, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 12, paddingVertical: 8 } as any}>
+                        <View style={{ flex: 1 } as any}>
+                          <Text style={{ fontFamily: typography.fontFamily, fontSize: typography.sizes.sm, color: colors.textPrimary, fontWeight: '600' }}>{g.nombre}</Text>
+                          {!!g.codigo && <Text style={{ fontFamily: typography.fontFamily, fontSize: 11, color: colors.textSecondary }}>{g.codigo}</Text>}
+                        </View>
+                        <TouchableOpacity onPress={() => removeGrupoDraft(g.id)} style={{ padding: 4 }}>
+                          <Ionicons name="close" size={16} color={colors.textSecondary} />
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </View>
+            )}
             <View style={s.card}>
               <SectionHeader icon="document-text" title="TIPOS DE EVIDENCIA OPERATIVA" subtitle="Define los nombres que el responsable podrá usar al cargar evidencias. Si no defines ninguno, el campo es libre." />
               <View style={s.tipoEvRow}>

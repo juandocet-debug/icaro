@@ -4,8 +4,17 @@ import { crearAccionMetaUseCase, listarMiembrosUseCase, asignacionResponsableRep
 import { RequisitoVerificacion } from '../../domain/Accion';
 import { ProyectoMiembro } from '../../domain/ProyectoMiembro';
 import { SelectOption } from '../../../../shared/components/SearchableSelect';
+import { api } from '../../../../services/api';
 
 export type ReqDraft = Omit<RequisitoVerificacion, 'id'>;
+
+/** Borrador de grupo antes de guardar la acción (ID local temporal) */
+export interface GrupoDraft {
+  id: string;
+  nombre: string;
+  codigo: string;
+}
+
 
 export interface ResponsableSeleccionado {
   usuarioId: number;
@@ -47,6 +56,9 @@ export function useAccionForm(componenteId: string, proyectoId: string) {
   const [endDate,     setEndDate]     = useState('');
   const [requisitos,  setRequisitos]  = useState<ReqDraft[]>([]);
   const [requiereGrupos, setRequiereGrupos] = useState(false);
+  const [gruposDraft,    setGruposDraft]    = useState<GrupoDraft[]>([]);
+  const [grupoNombre,    setGrupoNombre]    = useState('');
+  const [grupoCodigo,    setGrupoCodigo]    = useState('');
   const [tiposEvidencia, setTiposEvidencia] = useState<string[]>([]);
   const [tipoEvInput,    setTipoEvInput]    = useState('');
   const [saving,      setSaving]      = useState(false);
@@ -64,6 +76,20 @@ export function useAccionForm(componenteId: string, proyectoId: string) {
     setRequisitos([]); setTiposEvidencia([]); setTipoEvInput(''); setError(null);
     setSelectedUserId(''); setTipoAsig('responsable'); setSeleccionados([]);
     setStartDate(''); setEndDate(''); setRequiereGrupos(false);
+    setGruposDraft([]); setGrupoNombre(''); setGrupoCodigo('');
+  };
+
+  // ── Handlers de grupos borrador ──────────────────────────────────────────────
+  const addGrupoDraft = () => {
+    const nombre = grupoNombre.trim();
+    if (!nombre) return;
+    if (gruposDraft.some(g => g.nombre.toLowerCase() === nombre.toLowerCase())) return;
+    setGruposDraft(prev => [...prev, { id: Date.now().toString(), nombre, codigo: grupoCodigo.trim() }]);
+    setGrupoNombre(''); setGrupoCodigo('');
+  };
+
+  const removeGrupoDraft = (id: string) => {
+    setGruposDraft(prev => prev.filter(g => g.id !== id));
   };
 
   // Cargar miembros del proyecto
@@ -159,6 +185,18 @@ export function useAccionForm(componenteId: string, proyectoId: string) {
         requiereGrupos,
       });
 
+      // ── Guardar grupos borradores después de crear la acción ─────────────────
+      if (requiereGrupos && gruposDraft.length > 0) {
+        for (const g of gruposDraft) {
+          try {
+            await api.post(`/api/acciones/${accion.id}/grupos/`, {
+              nombre: g.nombre,
+              ...(g.codigo ? { codigo: g.codigo } : {}),
+            });
+          } catch { /* No bloquear si falla un grupo individual */ }
+        }
+      }
+
       const erroresAsignacion: string[] = [];
       for (const resp of seleccionados) {
         try {
@@ -189,6 +227,9 @@ export function useAccionForm(componenteId: string, proyectoId: string) {
     startDate, setStartDate, endDate, setEndDate,
     requisitos, requiereGrupos, setRequiereGrupos, tiposEvidencia, tipoEvInput, setTipoEvInput,
     saving, error,
+    // Grupos borrador
+    gruposDraft, grupoNombre, setGrupoNombre, grupoCodigo, setGrupoCodigo,
+    addGrupoDraft, removeGrupoDraft,
     // Responsables
     miembros, loadingMiembros, selectedUserId, setSelectedUserId,
     tipoAsig, setTipoAsig, seleccionados, opcionesMiembros,
