@@ -36,6 +36,13 @@ class UploadModel(models.Model):
         app_label = 'uploads'
         db_table = 'uploads'
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['action', 'created_at'], name='uploads_action_created_idx'),
+            models.Index(fields=['requisito', 'action'], name='uploads_req_action_idx'),
+            models.Index(fields=['evidencia_actividad', 'created_at'], name='uploads_evact_created_idx'),
+            models.Index(fields=['status', 'created_at'], name='uploads_status_created_idx'),
+            models.Index(fields=['uploaded_by', 'created_at'], name='uploads_user_created_idx'),
+        ]
 
     def __str__(self):
         return f'Upload {self.file_name} - {self.status}'

@@ -20,6 +20,7 @@ class Accion:
     display_order: int = 0
     start_date: Optional[date] = None
     end_date: Optional[date] = None
+    requiere_grupos: bool = False
 
     @classmethod
     def crear(cls, componente_id: str, name: str, **kwargs) -> 'Accion':

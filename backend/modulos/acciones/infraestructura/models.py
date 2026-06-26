@@ -24,6 +24,8 @@ class AccionModel(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    requiere_grupos = models.BooleanField(default=False)
+
     class Meta:
         app_label = 'acciones'
         db_table = 'actions'
@@ -35,6 +37,37 @@ class AccionModel(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class AccionGrupoModel(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    accion = models.ForeignKey(AccionModel, on_delete=models.CASCADE, related_name='grupos')
+    nombre = models.CharField(max_length=255)
+    codigo = models.CharField(max_length=100, null=True, blank=True)
+    descripcion = models.TextField(null=True, blank=True)
+    activo = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        app_label = 'acciones'
+        db_table = 'accion_grupos'
+        ordering = ['nombre', 'created_at']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['accion', 'nombre'],
+                condition=models.Q(activo=True),
+                name='unique_active_group_name'
+            )
+        ]
+        indexes = [
+            models.Index(fields=['accion', 'activo'], name='group_accion_activo_idx'),
+            models.Index(fields=['accion', 'nombre'], name='group_accion_nombre_idx'),
+        ]
+
+    def __str__(self):
+        return f"{self.nombre} ({self.codigo})" if self.codigo else self.nombre
+
 
 
 class RequisitoVerificacionAccionModel(models.Model):

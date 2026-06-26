@@ -1,5 +1,4 @@
 from django.core.files.storage import default_storage
-from django.core.files.base import ContentFile
 from django.db import transaction
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -168,8 +167,8 @@ class UploadListCreateController(APIView):
 
         # ── 8. Guardar archivo físico ────────────────────────────────────────
         try:
-            contenido = archivo.read()
-            ruta = default_storage.save(f'evidencias/{accion_id}/{nombre}', ContentFile(contenido))
+            archivo.seek(0)
+            ruta = default_storage.save(f'evidencias/{accion_id}/{nombre}', archivo)
             try:
                 url_archivo = default_storage.url(ruta)
             except Exception:

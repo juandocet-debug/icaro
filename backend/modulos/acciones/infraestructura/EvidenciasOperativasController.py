@@ -50,15 +50,21 @@ def _s_evidencia(ev):
             'id': str(ev.creada_por_id),
             'nombre': creada_por_nombre,
         },
+        'grupo': {
+            'id': str(ev.grupo.id),
+            'nombre': ev.grupo.nombre,
+            'codigo': ev.grupo.codigo,
+        } if ev.grupo else None,
         'soportes': [_s_soporte(u) for u in soportes],
         'created_at': ev.created_at.strftime('%d %b %Y') if ev.created_at else None,
     }
 
 
+
 def _get_ev(ev_id, accion_id, usuario, es_gestor):
     try:
         ev = EvidenciaActividadModel.objects.select_related(
-            'creada_por', 'creada_por__profile'
+            'creada_por', 'creada_por__profile', 'accion', 'grupo'
         ).prefetch_related('soportes').get(id=ev_id, accion_id=accion_id)
     except EvidenciaActividadModel.DoesNotExist:
         raise ValueError('Evidencia no encontrada.')
@@ -92,7 +98,7 @@ class EvidenciasOperativasListCreateController(APIView):
             return Response({'ok': False, 'error': str(e)}, status=403)
 
         qs = EvidenciaActividadModel.objects.filter(accion_id=accion_id).select_related(
-            'creada_por', 'creada_por__profile'
+            'creada_por', 'creada_por__profile', 'grupo'
         ).prefetch_related('soportes')
         if not es_gestor:
             qs = qs.filter(creada_por=request.user)
@@ -119,6 +125,19 @@ class EvidenciasOperativasListCreateController(APIView):
                 'error': f'Tipo no permitido. Opciones: {", ".join(tipos_permitidos)}.',
             }, status=400)
 
+        grupo_id = request.data.get('grupo_id')
+        if getattr(accion, 'requiere_grupos', False):
+            if not grupo_id:
+                return Response({'ok': False, 'error': 'El grupo es obligatorio para esta acción.'}, status=400)
+
+        grupo_obj = None
+        if grupo_id:
+            from modulos.acciones.infraestructura.models import AccionGrupoModel
+            try:
+                grupo_obj = AccionGrupoModel.objects.get(id=grupo_id, accion_id=accion_id)
+            except (AccionGrupoModel.DoesNotExist, ValueError):
+                return Response({'ok': False, 'error': 'El grupo seleccionado no pertenece a esta acción o no existe.'}, status=400)
+
         ev = EvidenciaActividadModel.objects.create(
             accion=accion,
             creada_por=request.user,
@@ -127,12 +146,13 @@ class EvidenciasOperativasListCreateController(APIView):
             fecha_ejecucion=request.data.get('fecha_ejecucion') or None,
             cantidad_ejecutada=request.data.get('cantidad_ejecutada') or 0,
             estado='borrador',
+            grupo=grupo_obj,
         )
         # reload with related data
         ev = EvidenciaActividadModel.objects.select_related(
-            'creada_por', 'creada_por__profile'
+            'creada_por', 'creada_por__profile', 'grupo'
         ).prefetch_related('soportes').get(id=ev.id)
-        _audit(request, 'CREAR_EVIDENCIA_OPERATIVA', 'EvidenciaActividad', str(ev.id), {'nombre': nombre})
+        _audit(request, 'CREAR_EVIDENCIA_OPERATIVA', 'EvidenciaActividad', str(ev.id), {'nombre': nombre, 'grupo_id': grupo_id})
         return Response({'ok': True, 'datos': _s_evidencia(ev)}, status=201)
 
 
@@ -168,6 +188,21 @@ class EvidenciasOperativasDetailController(APIView):
             ev.fecha_ejecucion = request.data.get('fecha_ejecucion') or None
         if 'cantidad_ejecutada' in request.data:
             ev.cantidad_ejecutada = request.data.get('cantidad_ejecutada') or 0
+            
+        if 'grupo_id' in request.data or getattr(ev.accion, 'requiere_grupos', False):
+            grupo_id = request.data.get('grupo_id')
+            if getattr(ev.accion, 'requiere_grupos', False) and not grupo_id and not ev.grupo_id:
+                return Response({'ok': False, 'error': 'El grupo es obligatorio para esta acción.'}, status=400)
+            if grupo_id:
+                from modulos.acciones.infraestructura.models import AccionGrupoModel
+                try:
+                    grupo_obj = AccionGrupoModel.objects.get(id=grupo_id, accion_id=accion_id)
+                    ev.grupo = grupo_obj
+                except (AccionGrupoModel.DoesNotExist, ValueError):
+                    return Response({'ok': False, 'error': 'El grupo seleccionado no pertenece a esta acción o no existe.'}, status=400)
+            elif 'grupo_id' in request.data and not getattr(ev.accion, 'requiere_grupos', False):
+                ev.grupo = None
+
         ev.save()
         return Response({'ok': True, 'datos': _s_evidencia(ev)}, status=200)
 

@@ -81,6 +81,7 @@ def _s(a, include_requisitos=False):
         'start_date': str(a.start_date) if getattr(a, 'start_date', None) else None,
         'end_date': str(a.end_date) if getattr(a, 'end_date', None) else None,
         'tipos_evidencia_permitidos': getattr(a, 'tipos_evidencia_permitidos', []) or [],
+        'requiere_grupos': bool(getattr(a, 'requiere_grupos', False)),
     }
     if include_requisitos:
         # Primeros 3 responsables activos para el nodo del mapa
@@ -137,6 +138,9 @@ class AccionListCreateController(APIView):
 
         from .models import AccionModel
         acciones = AccionModel.objects.filter(component_id=comp_id).order_by('display_order', 'created_at')
+        req_grupos = request.query_params.get('requiere_grupos')
+        if req_grupos is not None:
+            acciones = acciones.filter(requiere_grupos=req_grupos.lower() in ('true', '1'))
         datos = [_s(a, include_requisitos=True) for a in acciones]
         return Response({'ok': True, 'datos': datos}, status=200)
 
@@ -167,6 +171,7 @@ class AccionListCreateController(APIView):
                 is_transversal=request.data.get('is_transversal', False),
                 start_date=request.data.get('start_date') or None,
                 end_date=request.data.get('end_date') or None,
+                requiere_grupos=bool(request.data.get('requiere_grupos', False)),
             )
         except ValueError as e:
             return Response({'ok': False, 'error': str(e)}, status=400)

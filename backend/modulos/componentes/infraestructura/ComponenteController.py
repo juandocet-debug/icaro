@@ -10,8 +10,18 @@ from modulos.componentes.aplicacion.EliminarComponenteUseCase import EliminarCom
 from modulos.proyectos.infraestructura.helpers import check_project_access, check_component_access
 from modulos.roles.aplicacion.VerificarPermisoUseCase import VerificarPermisoUseCase
 
-def _s(c): return {'id':str(c.id),'proyecto_id':str(c.proyecto_id),'meta_id':str(c.meta_id),'name':c.name,
-    'description':c.description,'display_order':c.display_order}
+def _s(c):
+    from modulos.acciones.infraestructura.models import AccionModel
+    has_groups = AccionModel.objects.filter(component_id=c.id, requiere_grupos=True).exists()
+    return {
+        'id': str(c.id),
+        'proyecto_id': str(c.proyecto_id),
+        'meta_id': str(c.meta_id),
+        'name': c.name,
+        'description': c.description,
+        'display_order': c.display_order,
+        'con_grupos': has_groups
+    }
 
 class ComponenteListCreateController(APIView):
     permission_classes = [IsAuthenticated]
@@ -24,10 +34,22 @@ class ComponenteListCreateController(APIView):
             return Response({'ok':False,'error':str(e)},status=403)
 
         meta_id = request.query_params.get('meta_id')
+        con_grupos = request.query_params.get('con_grupos')
         repo = DjangoComponenteRepository()
         componentes = ListarComponentesUseCase(repo).ejecutar(proyecto_id)
         if meta_id:
             componentes = [c for c in componentes if str(c.meta_id) == meta_id]
+        if con_grupos is not None:
+            from modulos.acciones.infraestructura.models import AccionModel
+            comp_ids_with_groups = AccionModel.objects.filter(
+                component__project_id=proyecto_id,
+                requiere_grupos=True
+            ).values_list('component_id', flat=True).distinct()
+            comp_ids_with_groups = [str(x) for x in comp_ids_with_groups]
+            if con_grupos.lower() in ('true', '1'):
+                componentes = [c for c in componentes if str(c.id) in comp_ids_with_groups]
+            else:
+                componentes = [c for c in componentes if str(c.id) not in comp_ids_with_groups]
         return Response({'ok':True,'datos':[_s(c) for c in componentes]},status=200)
     def post(self, request, proyecto_id):
         try:

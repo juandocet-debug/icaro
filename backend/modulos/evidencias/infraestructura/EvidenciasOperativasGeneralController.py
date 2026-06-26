@@ -110,6 +110,11 @@ def _serialize_evidencia_general(ev):
                 for r in (getattr(ev.accion, 'requisitos_activos', []) if ev.accion else [])
             ],
         },
+        'grupo': {
+            'id': str(ev.grupo.id),
+            'nombre': ev.grupo.nombre,
+            'codigo': ev.grupo.codigo,
+        } if ev.grupo else None,
         'soportes': [_serialize_soporte(u) for u in soportes],
         'created_at': ev.created_at.strftime('%d %b %Y') if ev.created_at else None,
     }
@@ -152,7 +157,7 @@ class EvidenciasOperativasGeneralController(APIView):
             accion__component__project_id=proyecto_id
         ).select_related(
             'creada_por', 'creada_por__profile',
-            'accion', 'accion__component', 'accion__component__meta',
+            'accion', 'accion__component', 'accion__component__meta', 'grupo',
         ).prefetch_related(
             'soportes', 'soportes__requisito',
             Prefetch(
@@ -173,6 +178,10 @@ class EvidenciasOperativasGeneralController(APIView):
         fecha_hasta = request.query_params.get('fecha_hasta')
         if fecha_hasta:
             qs = qs.filter(fecha_ejecucion__lte=fecha_hasta)
+
+        grupo_id = request.query_params.get('grupo_id')
+        if grupo_id:
+            qs = qs.filter(grupo_id=grupo_id)
 
         q = (request.query_params.get('q') or '').strip()
         if q:

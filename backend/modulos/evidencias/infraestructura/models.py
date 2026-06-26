@@ -40,7 +40,16 @@ class EvidenciaActividadModel(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    grupo = models.ForeignKey('acciones.AccionGrupoModel', null=True, blank=True, on_delete=models.PROTECT, related_name='evidencias_operativas')
+
     class Meta:
         app_label = 'evidencias'
         db_table = 'evidencias_actividad'
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['accion', 'created_at'], name='evact_accion_created_idx'),
+            models.Index(fields=['estado', 'created_at'], name='evact_estado_created_idx'),
+            models.Index(fields=['creada_por', 'created_at'], name='evact_user_created_idx'),
+            models.Index(fields=['grupo', 'created_at'], name='evact_grupo_created_idx'),
+        ]
+

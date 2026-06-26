@@ -230,7 +230,7 @@ STORAGES = {
 # Permitir archivos de hasta 52MB en memoria para que el controller
 # pueda validar el límite de 20MB o 50MB con su propio mensaje de error.
 DATA_UPLOAD_MAX_MEMORY_SIZE = 52 * 1024 * 1024   # 52 MB
-FILE_UPLOAD_MAX_MEMORY_SIZE = 52 * 1024 * 1024   # 52 MB
+FILE_UPLOAD_MAX_MEMORY_SIZE = 2 * 1024 * 1024    # 2 MB; archivos mayores van a disco temporal
 
 _CLOUDINARY_URL = os.getenv('CLOUDINARY_URL', '')
 _AWS_KEY        = os.getenv('AWS_ACCESS_KEY_ID', '')
@@ -322,14 +322,19 @@ SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_BROWSER_XSS_FILTER   = True
 
 if not DEBUG:
+    SECURE_PROXY_SSL_HEADER     = ('HTTP_X_FORWARDED_PROTO', 'https')
+    USE_X_FORWARDED_HOST        = True
     SECURE_SSL_REDIRECT          = True
     SECURE_HSTS_SECONDS          = 31536000   # 1 año
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD          = True
     SESSION_COOKIE_SECURE        = True
     SESSION_COOKIE_HTTPONLY      = True
+    SESSION_COOKIE_SAMESITE      = 'Lax'
     CSRF_COOKIE_SECURE           = True
     CSRF_COOKIE_HTTPONLY         = True
+    CSRF_COOKIE_SAMESITE         = 'Lax'
+    SECURE_REFERRER_POLICY       = 'same-origin'
 
 SPECTACULAR_SETTINGS = {
     'TITLE': 'Icaro API',
