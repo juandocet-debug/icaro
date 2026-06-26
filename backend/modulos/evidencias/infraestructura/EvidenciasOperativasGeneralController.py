@@ -124,31 +124,50 @@ class EvidenciasOperativasGeneralController(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, proyecto_id):
+        # ── 1. Verificar acceso al proyecto ──────────────────────────────────
         try:
             check_project_access(proyecto_id, request.user)
-
-            es_gestor = False
-            if request.user.is_superuser:
-                es_gestor = True
-            else:
-                roles_manager = [
-                    'superadministrador', 'administrador_proyecto',
-                    'coordinador_proyecto', 'coordinador_general',
-                ]
-                if UsuarioRolModel.objects.filter(
-                    usuario=request.user,
-                    proyecto_id=proyecto_id,
-                    rol__codigo__in=roles_manager,
-                    activo=True,
-                ).exists():
-                    es_gestor = True
-
-            if not es_gestor:
-                return Response({'ok': False, 'error': 'No tienes permisos de gestor en este proyecto.'}, status=403)
         except ValueError as e:
             return Response({'ok': False, 'error': str(e)}, status=404)
         except PermissionError as e:
             return Response({'ok': False, 'error': str(e)}, status=403)
+
+        # ── 2. Determinar nivel de acceso ─────────────────────────────────────
+        es_gestor = False
+        componentes_restringidos = None  # None = ve todo el proyecto
+
+        if request.user.is_superuser:
+            es_gestor = True
+        else:
+            roles_manager = [
+                'superadministrador', 'administrador_proyecto',
+                'coordinador_proyecto', 'coordinador_general',
+            ]
+            if UsuarioRolModel.objects.filter(
+                usuario=request.user,
+                proyecto_id=proyecto_id,
+                rol__codigo__in=roles_manager,
+                activo=True,
+            ).exists():
+                es_gestor = True
+            else:
+                # coordinador_componente: acceso acotado a sus componentes asignados
+                comp_ids = list(
+                    UsuarioRolModel.objects.filter(
+                        usuario=request.user,
+                        proyecto_id=proyecto_id,
+                        rol__codigo='coordinador_componente',
+                        activo=True,
+                        componente_id__isnull=False,
+                    ).values_list('componente_id', flat=True)
+                )
+                if comp_ids:
+                    es_gestor = True
+                    componentes_restringidos = comp_ids  # Solo sus componentes
+
+        if not es_gestor:
+            return Response({'ok': False, 'error': 'No tienes permisos de gestor en este proyecto.'}, status=403)
+
 
         from django.db.models import Count, Prefetch
         from modulos.acciones.infraestructura.models import RequisitoVerificacionAccionModel
@@ -166,6 +185,10 @@ class EvidenciasOperativasGeneralController(APIView):
                 to_attr='requisitos_activos',
             ),
         )
+
+        # Filtro de componente para coordinador_componente
+        if componentes_restringidos is not None:
+            qs = qs.filter(accion__component_id__in=componentes_restringidos)
 
         estado = request.query_params.get('estado')
         if estado:
