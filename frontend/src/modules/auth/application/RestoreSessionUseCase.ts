@@ -11,8 +11,15 @@ export class RestoreSessionUseCase {
 
   async ejecutar(): Promise<AuthTokens | null> {
     if (isWeb) {
-      // Web: el refresh token viaja como cookie HTTP-Only.
-      // Intentamos un refresh silencioso — el navegador envía la cookie automáticamente.
+      // Web: intentar recuperar el access token de sessionStorage primero.
+      // sessionStorage persiste durante F5 dentro de la misma pestaña.
+      const existingToken = await this.tokenStorage.getAccessToken();
+      if (existingToken) {
+        // Token encontrado en sessionStorage — sesión activa, no hace falta refresh
+        return { access: existingToken, refresh: '' } as any;
+      }
+
+      // Sin token en sessionStorage: intentar refresh silencioso via cookie HTTP-Only.
       try {
         const newTokens = await this.authRepository.refreshToken('');
         await this.tokenStorage.saveTokens(newTokens.access, (newTokens as any).refresh ?? '');

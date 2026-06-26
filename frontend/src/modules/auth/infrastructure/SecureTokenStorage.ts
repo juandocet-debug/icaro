@@ -4,12 +4,37 @@ import { TokenStoragePort } from '../domain/TokenStoragePort';
 
 const ACCESS_KEY  = 'icaro_access_token';
 const REFRESH_KEY = 'icaro_refresh_token';
+// Clave en sessionStorage (web) — persiste en la pestaña activa, se borra al cerrarla
+const SESSION_ACCESS_KEY = 'icaro_session_access';
 
-// Cache en memoria — válido durante la sesión activa
-// En web: los tokens viven en cookies HTTP-Only; aquí solo guardamos la copia de trabajo
-// En native: copia de trabajo + respaldo en SecureStore
+// Cache en memoria — válido durante la sesión activa.
+// En web: respaldado por sessionStorage para sobrevivir recargas (F5).
+// En native: respaldado por SecureStore.
 let _inMemoryAccessToken:  string | null = null;
 let _inMemoryRefreshToken: string | null = null;
+
+/** Lectura segura de sessionStorage (solo web, sin lanzar en SSR) */
+const _sessionGet = (key: string): string | null => {
+  try {
+    return typeof sessionStorage !== 'undefined' ? sessionStorage.getItem(key) : null;
+  } catch {
+    return null;
+  }
+};
+
+/** Escritura segura en sessionStorage */
+const _sessionSet = (key: string, value: string): void => {
+  try {
+    if (typeof sessionStorage !== 'undefined') sessionStorage.setItem(key, value);
+  } catch { /* ignorar — storage lleno o bloqueado */ }
+};
+
+/** Borrado seguro de sessionStorage */
+const _sessionRemove = (key: string): void => {
+  try {
+    if (typeof sessionStorage !== 'undefined') sessionStorage.removeItem(key);
+  } catch { /* ignorar */ }
+};
 
 export const SecureTokenStorage: TokenStoragePort & {
   getAccessToken(): Promise<string | null>;
@@ -18,9 +43,12 @@ export const SecureTokenStorage: TokenStoragePort & {
     _inMemoryAccessToken  = access;
     _inMemoryRefreshToken = refresh;
 
-    // Web: las cookies HTTP-Only las gestiona el servidor y el navegador automáticamente.
-    // NO se persiste nada en sessionStorage ni localStorage (elimina superficie de ataque XSS).
-    if (Platform.OS !== 'web') {
+    if (Platform.OS === 'web') {
+      // Web: persiste el access token en sessionStorage para sobrevivir F5.
+      // - sessionStorage se borra automáticamente al cerrar la pestaña.
+      // - El refresh token NO se guarda aquí — viaja como cookie HTTP-Only.
+      _sessionSet(SESSION_ACCESS_KEY, access);
+    } else {
       try {
         await SecureStore.setItemAsync(ACCESS_KEY, access);
         await SecureStore.setItemAsync(REFRESH_KEY, refresh);
@@ -34,7 +62,10 @@ export const SecureTokenStorage: TokenStoragePort & {
     _inMemoryAccessToken  = null;
     _inMemoryRefreshToken = null;
 
-    if (Platform.OS !== 'web') {
+    if (Platform.OS === 'web') {
+      _sessionRemove(SESSION_ACCESS_KEY);
+      // El refresh cookie lo elimina el servidor en /api/auth/logout/
+    } else {
       try {
         await SecureStore.deleteItemAsync(ACCESS_KEY);
         await SecureStore.deleteItemAsync(REFRESH_KEY);
@@ -42,15 +73,23 @@ export const SecureTokenStorage: TokenStoragePort & {
         console.error('Error al eliminar tokens de SecureStore', e);
       }
     }
-    // En web, las cookies las elimina el endpoint /api/auth/logout/
   },
 
   async getAccessToken(): Promise<string | null> {
+    // 1. Memoria (más rápido, ya hidratado)
     if (_inMemoryAccessToken) return _inMemoryAccessToken;
 
-    // En web no hay persistencia local — el cookie viaja solo con withCredentials
-    if (Platform.OS === 'web') return null;
+    if (Platform.OS === 'web') {
+      // 2. Web: sessionStorage sobrevive F5 dentro de la misma pestaña
+      const stored = _sessionGet(SESSION_ACCESS_KEY);
+      if (stored) {
+        _inMemoryAccessToken = stored; // hidratar memoria
+        return stored;
+      }
+      return null;
+    }
 
+    // 3. Native: SecureStore
     try {
       _inMemoryAccessToken = await SecureStore.getItemAsync(ACCESS_KEY);
     } catch (e) {
@@ -62,6 +101,7 @@ export const SecureTokenStorage: TokenStoragePort & {
   async getRefreshToken(): Promise<string | null> {
     if (_inMemoryRefreshToken) return _inMemoryRefreshToken;
 
+    // En web el refresh token viaja como cookie HTTP-Only — no se lee desde JS
     if (Platform.OS === 'web') return null;
 
     try {
