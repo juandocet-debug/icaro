@@ -119,7 +119,7 @@ const footer = (logoBotB64: string | null, accionNombre: string) => `
 // ─── PORTADA ───────────────────────────────────────────────────────────────
 export interface PortadaParams {
   proyectoNombre: string; metaNombre: string; componenteNombre: string;
-  accionNombre: string; calendarHtml: string;
+  accionNombre: string; grupoNombre?: string; calendarHtml: string;
   logoTopB64: string | null; logoBottomB64: string | null;
 }
 export function portadaHtml(p: PortadaParams): string {
@@ -132,6 +132,7 @@ export function portadaHtml(p: PortadaParams): string {
         <tr><td>Meta / Objetivo</td><td>${p.metaNombre || '—'}</td></tr>
         ${p.componenteNombre ? `<tr><td>Componente</td><td>${p.componenteNombre}</td></tr>` : ''}
         <tr><td>Acción / Actividad</td><td>${p.accionNombre}</td></tr>
+        ${p.grupoNombre ? `<tr><td>Grupo / Cohorte</td><td><strong>${p.grupoNombre}</strong></td></tr>` : ''}
       </table>
       <hr class="div" />
       <div class="sec">CRONOGRAMA DE SESIONES</div>

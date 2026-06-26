@@ -13,7 +13,7 @@ import { useAccess } from '../../auth/presentation/useAccess';
 import { SearchableSelect, SelectOption } from '../../../shared/components/SearchableSelect';
 import { styles, htmlInputStyle, htmlDateInputStyle, htmlSelectStyle, htmlPageSelectStyle, htmlTextAreaStyle } from './EvidenciasDashboardScreen.styles';
 import { generateEvidenciasPDF } from './utils/pdf/generatePDF';
-import { ActionGroupFilters } from './components/groups/ActionGroupFilters';
+import { ActionGroupFilters, ActionGroupSelect } from './components/groups/ActionGroupFilters';
 
 
 interface Soporte {
@@ -543,11 +543,17 @@ export const EvidenciasDashboardScreen: React.FC<Props> = ({ proyectoId }) => {
     const componenteNombre = selectedComponente !== 'todos' ? selectedComponente : '';
     const accionNombre     = selectedAccion     !== 'todos' ? selectedAccion     : 'Reporte General de Evidencias';
 
+    // Grupo: si hay un grupo seleccionado, tomar su nombre de las evidencias
+    const grupoNombre = selectedGrupoId
+      ? (filteredEvidencias.find(ev => ev.grupo?.id === selectedGrupoId)?.grupo?.nombre ?? '')
+      : '';
+
     await generateEvidenciasPDF({
       proyectoNombre,
       metaNombre,
       componenteNombre,
       accionNombre,
+      grupoNombre,
       evidencias: filteredEvidencias,
     });
 
@@ -720,6 +726,17 @@ export const EvidenciasDashboardScreen: React.FC<Props> = ({ proyectoId }) => {
             </View>
           </View>
 
+          {/* Grupo / Cohorte — solo si la acción seleccionada tiene grupos */}
+          {selectedAccionId && (
+            <View style={[styles.filterGroup, { flex: 1.2, minWidth: 170 } as any]}>
+              <ActionGroupSelect
+                accionId={selectedAccionId}
+                selectedGrupoId={selectedGrupoId}
+                onSelectGrupoId={setSelectedGrupoId}
+              />
+            </View>
+          )}
+
           {/* Fechas */}
           <View style={[styles.filterGroup, { flex: 1, minWidth: 130 } as any]}>
             <Text style={styles.filterLabel}>Fecha desde</Text>
@@ -749,13 +766,6 @@ export const EvidenciasDashboardScreen: React.FC<Props> = ({ proyectoId }) => {
             </View>
           </View>
         </View>
-        {selectedAccionId && (
-          <ActionGroupFilters
-            accionId={selectedAccionId}
-            selectedGrupoId={selectedGrupoId}
-            onSelectGrupoId={setSelectedGrupoId}
-          />
-        )}
       </Card>
 
       {/* Tabla Collapsible al 100% de Ancho */}

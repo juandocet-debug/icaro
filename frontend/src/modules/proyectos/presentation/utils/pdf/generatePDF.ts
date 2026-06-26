@@ -21,6 +21,7 @@ export interface PDFParams {
   metaNombre: string;
   componenteNombre: string;
   accionNombre: string;
+  grupoNombre?: string;
   evidencias: any[];
 }
 
@@ -29,7 +30,7 @@ export async function generateEvidenciasPDF(params: PDFParams): Promise<string |
     return 'La descarga de PDF solo está disponible en la versión web.';
   }
 
-  const { proyectoNombre, metaNombre, componenteNombre, accionNombre, evidencias } = params;
+  const { proyectoNombre, metaNombre, componenteNombre, accionNombre, grupoNombre, evidencias } = params;
   const evs = evidencias.slice(0, MAX_EVIDENCIAS);
 
   // ── 1. Recopilar URLs de imágenes distinguiendo tipo ─────────────────────
@@ -66,6 +67,7 @@ export async function generateEvidenciasPDF(params: PDFParams): Promise<string |
 
   const portada = portadaHtml({
     proyectoNombre, metaNombre, componenteNombre, accionNombre,
+    grupoNombre: grupoNombre || '',
     calendarHtml: calHtml, logoTopB64: logoTop, logoBottomB64: logoBot,
   });
 
