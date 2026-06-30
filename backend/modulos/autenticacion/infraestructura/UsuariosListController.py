@@ -1,7 +1,9 @@
 from django.contrib.auth import get_user_model
+import hmac
+import os
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from modulos.autenticacion.aplicacion.CrearUsuarioUseCase import CrearUsuarioUseCase
 from modulos.autenticacion.aplicacion.ActualizarDatosUsuarioUseCase import ActualizarDatosUsuarioUseCase
 from modulos.roles.aplicacion.VerificarPermisoUseCase import VerificarPermisoUseCase
@@ -120,6 +122,31 @@ class UsuariosListController(APIView):
             return Response({'ok': True, 'datos': datos}, status=201)
         except ValueError as e:
             return Response({'ok': False, 'error': str(e)}, status=400)
+
+
+class DoxaUsuariosIntegrationController(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+    pagination_class = None
+
+    def get(self, request):
+        expected_token = os.getenv('DOXA_SERVICE_TOKEN', '').strip()
+        provided_token = request.headers.get('X-DOXA-SERVICE-TOKEN', '').strip()
+
+        if not expected_token or not provided_token or not hmac.compare_digest(expected_token, provided_token):
+            return Response({'ok': False, 'error': 'No autorizado.'}, status=401)
+
+        from django.db.models import Count, Q
+
+        qs = User.objects.filter(is_active=True).select_related('profile').annotate(
+            asignaciones_count=Count(
+                'usuario_roles__proyecto_id',
+                filter=Q(usuario_roles__activo=True),
+                distinct=True,
+            )
+        ).order_by('username')
+
+        return Response({'ok': True, 'datos': [_s(u, request) for u in qs]}, status=200)
 
 class UsuarioDetailController(APIView):
     permission_classes = [IsAuthenticated]

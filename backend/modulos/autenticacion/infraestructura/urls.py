@@ -3,7 +3,7 @@ from django.contrib.auth import get_user_model
 from rest_framework.response import Response
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from .PerfilController import MiPerfilController, CambiarClaveController, FotoPerfilController, MiAccesoController
-from .UsuariosListController import UsuariosListController, UsuarioDetailController, UsuarioAsignacionesController
+from .UsuariosListController import DoxaUsuariosIntegrationController, UsuariosListController, UsuarioDetailController, UsuarioAsignacionesController
 from .throttling import LoginRateThrottle, RefreshRateThrottle
 from .CookieAuth import set_auth_cookies, COOKIE_REFRESH
 from .LogoutController import LogoutController
@@ -97,5 +97,6 @@ urlpatterns = [
     path('usuarios/', UsuariosListController.as_view(), name='usuarios-list'),
     path('usuarios/<int:user_id>/', UsuarioDetailController.as_view(), name='usuario-detail'),
     path('usuarios/<int:user_id>/asignaciones/', UsuarioAsignacionesController.as_view(), name='usuario-asignaciones'),
+    path('integrations/doxa/users/', DoxaUsuariosIntegrationController.as_view(), name='doxa-users-integration'),
 ]
 
