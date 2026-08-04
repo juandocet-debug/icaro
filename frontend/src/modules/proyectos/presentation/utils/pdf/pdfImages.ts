@@ -10,6 +10,7 @@ function imageToCompressedDataUrl(
   src: string,
   maxPx: number,
   quality: number,
+  mimeType = 'image/jpeg',
   revokeUrl?: string,
 ): Promise<string | null> {
   return new Promise<string | null>((resolve) => {
@@ -23,8 +24,12 @@ function imageToCompressedDataUrl(
         canvas.height = Math.round(img.height * scale);
         const ctx = canvas.getContext('2d');
         if (!ctx) { resolve(null); return; }
+        if (mimeType === 'image/jpeg') {
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        resolve(canvas.toDataURL('image/jpeg', quality));
+        resolve(canvas.toDataURL(mimeType, quality));
       } catch { resolve(null); }
       finally { if (revokeUrl) URL.revokeObjectURL(revokeUrl); }
     };
@@ -38,17 +43,18 @@ export async function imageSourceToBase64(
   url: string,
   maxPx = DEFAULT_MAX_PX,
   quality = DEFAULT_QUALITY,
+  mimeType = 'image/jpeg',
 ): Promise<string | null> {
   if (!url) return null;
   try {
     if (url.startsWith('data:image/')) {
-      return await imageToCompressedDataUrl(url, maxPx, quality);
+      return await imageToCompressedDataUrl(url, maxPx, quality, mimeType);
     }
     const res = await fetch(url, { mode: 'cors' });
     if (!res.ok) return null;
     const blob = await res.blob();
     const objUrl = URL.createObjectURL(blob);
-    return await imageToCompressedDataUrl(objUrl, maxPx, quality, objUrl);
+    return await imageToCompressedDataUrl(objUrl, maxPx, quality, mimeType, objUrl);
   } catch { return null; }
 }
 

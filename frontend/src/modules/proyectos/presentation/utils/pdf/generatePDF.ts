@@ -53,9 +53,9 @@ export async function generateEvidenciasPDF(params: PDFParams): Promise<string |
 
   // ── 2. Comprimir TODO en paralelo (logos ya en base64 → sin fetch) ────────
   const allPromises: Promise<string | null>[] = [
-    imageSourceToBase64(LOGO_SUPERIOR_B64, 360, 0.78),
-    imageSourceToBase64(LOGO_INFERIOR_B64, 360, 0.78),
-    ...imgRefs.map((r) => imageUrlToBase64(r.url, r.isPlan ? 1400 : 1000, r.isPlan ? 0.72 : 0.66)),
+    imageSourceToBase64(LOGO_SUPERIOR_B64, 320, 0.9, 'image/png'),
+    imageSourceToBase64(LOGO_INFERIOR_B64, 320, 0.9, 'image/png'),
+    ...imgRefs.map((r) => imageUrlToBase64(r.url, r.isPlan ? 1200 : 820, r.isPlan ? 0.62 : 0.54)),
   ];
 
   const [logoTop, logoBot, ...compressedImgs] = await Promise.all(allPromises);
