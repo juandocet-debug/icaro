@@ -358,12 +358,18 @@ export const EvidenciasDashboardScreen: React.FC<Props> = ({ proyectoId }) => {
   const filteredEvidencias = useMemo(() => {
     return evidencias.filter(ev => {
       if (searchQuery) {
-        const query = searchQuery.toLowerCase();
-        const matchesColab = ev.creada_por?.nombre?.toLowerCase().includes(query);
-        const matchesAccion = ev.accion?.nombre?.toLowerCase().includes(query);
-        const matchesCodigo = ev.codigo_doxa?.toLowerCase().includes(query);
-        const matchesEv = ev.nombre?.toLowerCase().includes(query) || ev.descripcion?.toLowerCase().includes(query);
-        if (!matchesColab && !matchesAccion && !matchesCodigo && !matchesEv) return false;
+        const query = searchQuery.toLowerCase().trim();
+        const soporteTerms = (ev.soportes || []).flatMap(s => [
+          s.id, s.file_name, s.requisito_id, s.requisito_nombre,
+        ]);
+        const searchableTerms = [
+          ev.id, ev.codigo_doxa, ev.nombre, ev.descripcion,
+          ev.creada_por?.id, ev.creada_por?.nombre, ev.creada_por?.email,
+          ev.accion?.id, ev.accion?.nombre, ev.accion?.meta_nombre, ev.accion?.componente_nombre,
+          ev.grupo?.id, ev.grupo?.nombre, ev.grupo?.codigo,
+          ...soporteTerms,
+        ];
+        if (!searchableTerms.some(term => String(term || '').toLowerCase().includes(query))) return false;
       }
       if (selectedEstado === 'todos') {
         if (ev.estado === 'borrador') return false;

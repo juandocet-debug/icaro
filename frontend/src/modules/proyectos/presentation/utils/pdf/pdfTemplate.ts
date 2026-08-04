@@ -7,8 +7,16 @@
  * - Asistencia: 1 por hoja, imagen a máximo alto disponible
  */
 
+const normalizeLabel = (value: string): string =>
+  value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
 export const isAsistencia = (s: any): boolean =>
-  (s.requisito_nombre || s.file_name || '').toLowerCase().includes('asistencia');
+  normalizeLabel(s.requisito_nombre || s.file_name || '').includes('asistencia');
+
+export const isPlanSesion = (s: any): boolean => {
+  const label = normalizeLabel(s.requisito_nombre || s.file_name || '');
+  return label.includes('plan de sesion') || label.includes('plan sesion') || label.includes('planeacion');
+};
 
 // ─── CSS compartido ────────────────────────────────────────────────────────
 export function getSharedCss(): string {
@@ -78,11 +86,22 @@ export function getSharedCss(): string {
       display: flex;
       flex-direction: column;
       flex: 1;
-      max-height: 48%;
+      min-height: 0;
       overflow: hidden;
     }
     .photo-cell .photo-lbl { font-size:8px; color:#475569; font-style:italic; margin-bottom:3px; flex-shrink:0; }
-    .photo-cell img { flex:1; width:100%; max-height:95mm; object-fit:contain; min-height:0; }
+    .photo-cell img { flex:1; width:100%; height:100%; object-fit:contain; min-height:0; }
+
+    /* Plan de sesión: una hoja propia, grande, centrado y legible */
+    .plan-img {
+      flex: 1; min-height: 0; overflow: hidden;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .plan-img img {
+      width: 90%;
+      max-height: 224mm;
+      object-fit: contain;
+    }
 
     /* Asistencia: hoja vertical A4, imagen rotada 90° para verse horizontal */
     .asist-img {
@@ -212,6 +231,24 @@ export function fotosPageHtml(
             <img src="${f.b64}" />
           </div>`).join('')}
       </div>
+    </div>
+    ${footer(logoBotB64, accionNombre)}
+  </div>`).join('');
+}
+
+// Plan de sesión (1 por hoja, 90% centrado)
+export function planSesionPageHtml(
+  fotos: { label: string; b64: string | null }[],
+  logoTopB64: string | null, logoBotB64: string | null, accionNombre: string,
+): string {
+  if (!fotos.length) return '';
+  return fotos.map((f) => !f.b64 ? '' : `
+  <div class="page break">
+    ${header(logoTopB64)}
+    <div class="page-body">
+      <div class="sec">PLAN DE SESIÓN</div>
+      <div class="photo-lbl">Plan de sesión</div>
+      <div class="plan-img"><img src="${f.b64}" /></div>
     </div>
     ${footer(logoBotB64, accionNombre)}
   </div>`).join('');

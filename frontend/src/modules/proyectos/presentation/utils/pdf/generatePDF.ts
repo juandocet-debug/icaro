@@ -5,9 +5,9 @@
  * - Header/footer absolutamente fijos (height:297mm por página)
  */
 import { Platform } from 'react-native';
-import { imageUrlToBase64 } from './pdfImages';
+import { imageSourceToBase64, imageUrlToBase64 } from './pdfImages';
 import { buildCalendarHtml } from './pdfCalendar';
-import { getSharedCss, portadaHtml, evidenciaPageHtml, fotosPageHtml, asistenciaPageHtml, docsPageHtml, isAsistencia } from './pdfTemplate';
+import { getSharedCss, portadaHtml, evidenciaPageHtml, fotosPageHtml, planSesionPageHtml, asistenciaPageHtml, docsPageHtml, isAsistencia, isPlanSesion } from './pdfTemplate';
 import { LOGO_SUPERIOR_B64, LOGO_INFERIOR_B64 } from './pdfLogos';
 import { env } from '../../../../../config/env';
 
@@ -34,7 +34,7 @@ export async function generateEvidenciasPDF(params: PDFParams): Promise<string |
   const evs = evidencias.slice(0, MAX_EVIDENCIAS);
 
   // ── 1. Recopilar URLs de imágenes distinguiendo tipo ─────────────────────
-  type ImgRef = { evIdx: number; sIdx: number; url: string; label: string; isAsis: boolean };
+  type ImgRef = { evIdx: number; sIdx: number; url: string; label: string; isAsis: boolean; isPlan: boolean };
   const imgRefs: ImgRef[] = [];
 
   evs.forEach((ev, evIdx) => {
@@ -45,6 +45,7 @@ export async function generateEvidenciasPDF(params: PDFParams): Promise<string |
           url:    toAbsUrl(s.file_url),
           label:  s.requisito_nombre || s.file_name || `Foto ${sIdx + 1}`,
           isAsis: isAsistencia(s),
+          isPlan: isPlanSesion(s),
         });
       }
     });
@@ -52,9 +53,9 @@ export async function generateEvidenciasPDF(params: PDFParams): Promise<string |
 
   // ── 2. Comprimir TODO en paralelo (logos ya en base64 → sin fetch) ────────
   const allPromises: Promise<string | null>[] = [
-    Promise.resolve(LOGO_SUPERIOR_B64),
-    Promise.resolve(LOGO_INFERIOR_B64),
-    ...imgRefs.map((r) => imageUrlToBase64(r.url, 900, 0.65)),
+    imageSourceToBase64(LOGO_SUPERIOR_B64, 360, 0.78),
+    imageSourceToBase64(LOGO_INFERIOR_B64, 360, 0.78),
+    ...imgRefs.map((r) => imageUrlToBase64(r.url, r.isPlan ? 1400 : 1000, r.isPlan ? 0.72 : 0.66)),
   ];
 
   const [logoTop, logoBot, ...compressedImgs] = await Promise.all(allPromises);
@@ -75,6 +76,7 @@ export async function generateEvidenciasPDF(params: PDFParams): Promise<string |
     const informe = evidenciaPageHtml(ev, logoTop, logoBot, accionNombre);
 
     // Separar fotos regulares de listas de asistencia
+    const planesSesion: { label: string; b64: string | null }[] = [];
     const fotosRegulares: { label: string; b64: string | null }[] = [];
     const fotosAsistencia: { label: string; b64: string | null }[] = [];
 
@@ -82,7 +84,9 @@ export async function generateEvidenciasPDF(params: PDFParams): Promise<string |
       if (!s.file_type?.startsWith('image/')) return;
       const ref = imgRefs.find((r) => r.evIdx === evIdx && r.sIdx === sIdx);
       const item = { label: ref?.label ?? s.file_name, b64: imgMap.get(`${evIdx}-${sIdx}`) ?? null };
-      if (ref?.isAsis) {
+      if (ref?.isPlan) {
+        planesSesion.push(item);
+      } else if (ref?.isAsis) {
         fotosAsistencia.push(item);
       } else {
         fotosRegulares.push(item);
@@ -95,6 +99,7 @@ export async function generateEvidenciasPDF(params: PDFParams): Promise<string |
 
     return (
       informe
+      + planSesionPageHtml(planesSesion, logoTop, logoBot, accionNombre)
       + fotosPageHtml(fotosRegulares, logoTop, logoBot, accionNombre)
       + asistenciaPageHtml(fotosAsistencia, logoTop, logoBot, accionNombre)
       + docsPageHtml(docs, logoTop, logoBot, accionNombre)
