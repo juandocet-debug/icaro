@@ -14,6 +14,11 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # ── Validaciones Obligatorias de Entorno (Aislamiento Total) ───────────────────
 ENVIRONMENT = os.getenv('ENVIRONMENT', 'development')
+RUNNING_ON_RAILWAY = any(
+    os.getenv(name)
+    for name in ('RAILWAY_ENVIRONMENT', 'RAILWAY_PROJECT_ID', 'RAILWAY_SERVICE_ID', 'RAILWAY_PUBLIC_DOMAIN')
+)
+IS_PUBLIC_RUNTIME = ENVIRONMENT == 'production' or RUNNING_ON_RAILWAY
 EXPECTED_DATABASE = os.getenv('EXPECTED_DATABASE')
 DATABASE_URL = os.getenv('DATABASE_URL')
 
@@ -37,7 +42,7 @@ FIELD_ENCRYPTION_KEY = os.getenv('FIELD_ENCRYPTION_KEY')
 if not FIELD_ENCRYPTION_KEY:
     raise ImproperlyConfigured("Falta la variable obligatoria: FIELD_ENCRYPTION_KEY.")
 
-DEBUG = ENVIRONMENT == 'development'
+DEBUG = ENVIRONMENT == 'development' and not IS_PUBLIC_RUNTIME
 
 raw_hosts = os.getenv('ALLOWED_HOSTS')
 if raw_hosts:
@@ -45,6 +50,7 @@ if raw_hosts:
 else:
     ALLOWED_HOSTS = ['*'] if DEBUG else [
         'icaro-production.up.railway.app',
+        'icaro-production-d286.up.railway.app',
         'localhost',
         '127.0.0.1',
     ]
@@ -59,6 +65,7 @@ else:
         'http://localhost:19007',
     ] if DEBUG else [
         'https://icaro-production.up.railway.app',
+        'https://icaro-production-d286.up.railway.app',
         'https://tu-frontend.vercel.app',
     ]
 

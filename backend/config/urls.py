@@ -10,21 +10,28 @@ from django.db import connection
 
 from rest_framework.permissions import IsAdminUser, AllowAny
 
+
+def _is_public_runtime():
+    return os.getenv('ENVIRONMENT', 'development') == 'production' or any(
+        os.getenv(name)
+        for name in ('RAILWAY_ENVIRONMENT', 'RAILWAY_PROJECT_ID', 'RAILWAY_SERVICE_ID', 'RAILWAY_PUBLIC_DOMAIN')
+    )
+
 class ProductionProtectedSpectacularAPIView(SpectacularAPIView):
     def get_permissions(self):
-        if os.getenv('ENVIRONMENT', 'development') == 'production':
+        if _is_public_runtime():
             return [IsAdminUser()]
         return [AllowAny()]
 
 class ProductionProtectedSpectacularSwaggerView(SpectacularSwaggerView):
     def get_permissions(self):
-        if os.getenv('ENVIRONMENT', 'development') == 'production':
+        if _is_public_runtime():
             return [IsAdminUser()]
         return [AllowAny()]
 
 class ProductionProtectedSpectacularRedocView(SpectacularRedocView):
     def get_permissions(self):
-        if os.getenv('ENVIRONMENT', 'development') == 'production':
+        if _is_public_runtime():
             return [IsAdminUser()]
         return [AllowAny()]
 
@@ -35,6 +42,7 @@ def health_check(request):
     """
     environment = os.getenv('ENVIRONMENT', 'development')
     expected_database = os.getenv('EXPECTED_DATABASE', 'unknown')
+    public_runtime = _is_public_runtime()
     
     # Validar Storage
     storage_type = "local" if environment != "production" else "cloudflare_r2_or_aws_s3"
@@ -44,7 +52,7 @@ def health_check(request):
         with connection.cursor() as cursor:
             cursor.execute("SELECT 1")
             
-        if environment == 'production':
+        if public_runtime:
             return JsonResponse({"status": "ok"}, status=200)
             
         return JsonResponse({
@@ -55,7 +63,7 @@ def health_check(request):
             "version": "1.0.0"
         }, status=200)
     except Exception as e:
-        if environment == 'production':
+        if public_runtime:
             return JsonResponse({"status": "error"}, status=503)
         return JsonResponse({
             "status": "error",

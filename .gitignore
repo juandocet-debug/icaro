@@ -20,6 +20,10 @@ htmlcov/
 backend/*.sqlite3
 backend/*.db
 
+# Archivos cargados por usuarios / datos operativos
+backend/media/
+!backend/media/.gitkeep
+
 # Frontend / Node
 node_modules/
 .expo/
