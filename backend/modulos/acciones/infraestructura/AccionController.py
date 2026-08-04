@@ -82,6 +82,7 @@ def _s(a, include_requisitos=False):
         'end_date': str(a.end_date) if getattr(a, 'end_date', None) else None,
         'tipos_evidencia_permitidos': getattr(a, 'tipos_evidencia_permitidos', []) or [],
         'requiere_grupos': bool(getattr(a, 'requiere_grupos', False)),
+        'requiere_codigo_doxa': bool(getattr(a, 'requiere_codigo_doxa', False)),
     }
     if include_requisitos:
         # Primeros 3 responsables activos para el nodo del mapa
@@ -172,6 +173,7 @@ class AccionListCreateController(APIView):
                 start_date=request.data.get('start_date') or None,
                 end_date=request.data.get('end_date') or None,
                 requiere_grupos=bool(request.data.get('requiere_grupos', False)),
+                requiere_codigo_doxa=bool(request.data.get('requiere_codigo_doxa', False)),
             )
         except ValueError as e:
             return Response({'ok': False, 'error': str(e)}, status=400)

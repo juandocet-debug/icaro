@@ -55,10 +55,17 @@ def test_create_action_with_groups_field(superuser, component):
     # Verify default is False
     action_def = AccionModel.objects.create(component=component, name="Accion Defecto")
     assert action_def.requiere_grupos is False
+    assert action_def.requiere_codigo_doxa is False
 
     # Verify explicitly True
-    action_true = AccionModel.objects.create(component=component, name="Accion True", requiere_grupos=True)
+    action_true = AccionModel.objects.create(
+        component=component,
+        name="Accion True",
+        requiere_grupos=True,
+        requiere_codigo_doxa=True,
+    )
     assert action_true.requiere_grupos is True
+    assert action_true.requiere_codigo_doxa is True
 
 
 @pytest.mark.django_db
@@ -135,15 +142,30 @@ def test_evidencias_requiere_grupos_validation(api_client, superuser, action_req
     assert res.status_code == 400
     assert 'no pertenece a esta acción' in res.data['error']
 
-    # 3. Post evidence with correct group_id -> should succeed
+    action_req_groups.requiere_codigo_doxa = True
+    action_req_groups.save(update_fields=['requiere_codigo_doxa'])
+
+    # 3. If the action requires Codigo Doxa, arbitrary text should fail
     res = api_client.post(url_ev_req, data={
-        'nombre': 'Visita Técnica',
+        'nombre': 'Visita TÃ©cnica',
         'grupo_id': str(grupo1.id),
-        'cantidad_ejecutada': 1.0
+        'cantidad_ejecutada': 1.0,
+        'codigo_doxa': 'cualquier cosa',
+    }, format='json')
+    assert res.status_code == 400
+    assert 'Doxa' in res.data['error']
+
+    # 4. Post evidence with correct group and Doxa code -> should succeed
+    res = api_client.post(url_ev_req, data={
+        'nombre': 'Visita TÃ©cnica',
+        'grupo_id': str(grupo1.id),
+        'cantidad_ejecutada': 1.0,
+        'codigo_doxa': 'tog01c03',
     }, format='json')
     assert res.status_code == 201
     ev_id = res.data['datos']['id']
     assert res.data['datos']['grupo']['id'] == str(grupo1.id)
+    assert res.data['datos']['codigo_doxa'] == 'TOG01C03'
 
     # 4. Post evidence on action_no_groups without group_id -> should succeed
     url_ev_no_req = f'/api/mis-actividades/{action_no_groups.id}/evidencias-operativas/'
@@ -188,7 +210,8 @@ def test_filtering_and_components_search(api_client, superuser, project, compone
         creada_por=superuser,
         nombre="Ev1",
         grupo=grupo,
-        cantidad_ejecutada=1.0
+        cantidad_ejecutada=1.0,
+        codigo_doxa='TOG01C03',
     )
     ev2 = EvidenciaActividadModel.objects.create(
         accion=action_no_groups,
@@ -203,6 +226,7 @@ def test_filtering_and_components_search(api_client, superuser, project, compone
     assert res.status_code == 200
     assert len(res.data['datos']) == 1
     assert res.data['datos'][0]['id'] == str(ev1.id)
+    assert res.data['datos'][0]['codigo_doxa'] == 'TOG01C03'
 
     # 2. Filter actions by requiere_grupos
     url_actions = f'/api/acciones/{component.id}/acciones/'

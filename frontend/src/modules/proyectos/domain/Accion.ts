@@ -39,4 +39,5 @@ export interface Accion {
   startDate?: string | null;
   endDate?: string | null;
   requiereGrupos?: boolean;
+  requiereCodigoDoxa?: boolean;
 }

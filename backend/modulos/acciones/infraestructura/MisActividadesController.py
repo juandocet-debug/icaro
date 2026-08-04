@@ -280,6 +280,7 @@ def _serialize_actividad_detallada(accion, usuario, request=None, _ctx: dict | N
             'avance_porcentaje': pct,
             'tipos_evidencia_permitidos': getattr(accion, 'tipos_evidencia_permitidos', []) or [],
             'requiere_grupos': bool(getattr(accion, 'requiere_grupos', False)),
+            'requiere_codigo_doxa': bool(getattr(accion, 'requiere_codigo_doxa', False)),
             'requisitos_verificacion': requisitos_data,
         },
         'mi_asignacion': {

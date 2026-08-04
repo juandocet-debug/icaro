@@ -1,3 +1,5 @@
+import re
+
 from django.db import transaction
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
@@ -12,6 +14,18 @@ from modulos.acciones.infraestructura.models import RequisitoVerificacionAccionM
 from modulos.acciones.infraestructura.MisActividadesController import _verificar_acceso_actividad, _audit
 
 MAX_SOPORTE_MB = 50
+CODIGO_DOXA_RE = re.compile(r'^[A-Z0-9]{2,6}G\d{2}C\d{2}$')
+
+
+def _validar_codigo_doxa(value, requerido=False):
+    codigo = (value or '').strip().upper()
+    if not codigo:
+        if requerido:
+            raise ValueError('El Código Doxa es obligatorio para esta acción.')
+        return None
+    if len(codigo) > 16 or not CODIGO_DOXA_RE.fullmatch(codigo):
+        raise ValueError('Código Doxa inválido. Usa formato como TOG01C03, en mayúsculas, sin espacios.')
+    return codigo
 
 
 def _s_soporte(u):
@@ -45,6 +59,7 @@ def _s_evidencia(ev):
         'fecha_ejecucion': str(ev.fecha_ejecucion) if ev.fecha_ejecucion else None,
         'cantidad_ejecutada': float(ev.cantidad_ejecutada),
         'estado': ev.estado,
+        'codigo_doxa': ev.codigo_doxa,
         'observacion_coordinador': ev.observacion_coordinador,
         'creada_por': {
             'id': str(ev.creada_por_id),
@@ -138,6 +153,14 @@ class EvidenciasOperativasListCreateController(APIView):
             except (AccionGrupoModel.DoesNotExist, ValueError):
                 return Response({'ok': False, 'error': 'El grupo seleccionado no pertenece a esta acción o no existe.'}, status=400)
 
+        try:
+            codigo_doxa = _validar_codigo_doxa(
+                request.data.get('codigo_doxa'),
+                requerido=bool(getattr(accion, 'requiere_codigo_doxa', False)),
+            )
+        except ValueError as e:
+            return Response({'ok': False, 'error': str(e)}, status=400)
+
         ev = EvidenciaActividadModel.objects.create(
             accion=accion,
             creada_por=request.user,
@@ -147,12 +170,13 @@ class EvidenciasOperativasListCreateController(APIView):
             cantidad_ejecutada=request.data.get('cantidad_ejecutada') or 0,
             estado='borrador',
             grupo=grupo_obj,
+            codigo_doxa=codigo_doxa,
         )
         # reload with related data
         ev = EvidenciaActividadModel.objects.select_related(
             'creada_por', 'creada_por__profile', 'grupo'
         ).prefetch_related('soportes').get(id=ev.id)
-        _audit(request, 'CREAR_EVIDENCIA_OPERATIVA', 'EvidenciaActividad', str(ev.id), {'nombre': nombre, 'grupo_id': grupo_id})
+        _audit(request, 'CREAR_EVIDENCIA_OPERATIVA', 'EvidenciaActividad', str(ev.id), {'nombre': nombre, 'grupo_id': grupo_id, 'codigo_doxa': codigo_doxa})
         return Response({'ok': True, 'datos': _s_evidencia(ev)}, status=201)
 
 
@@ -188,6 +212,15 @@ class EvidenciasOperativasDetailController(APIView):
             ev.fecha_ejecucion = request.data.get('fecha_ejecucion') or None
         if 'cantidad_ejecutada' in request.data:
             ev.cantidad_ejecutada = request.data.get('cantidad_ejecutada') or 0
+
+        if 'codigo_doxa' in request.data or getattr(ev.accion, 'requiere_codigo_doxa', False):
+            try:
+                ev.codigo_doxa = _validar_codigo_doxa(
+                    request.data.get('codigo_doxa', ev.codigo_doxa),
+                    requerido=bool(getattr(ev.accion, 'requiere_codigo_doxa', False)),
+                )
+            except ValueError as e:
+                return Response({'ok': False, 'error': str(e)}, status=400)
             
         if 'grupo_id' in request.data or getattr(ev.accion, 'requiere_grupos', False):
             grupo_id = request.data.get('grupo_id')
@@ -452,6 +485,9 @@ class EvidenciasOperativasEnviarController(APIView):
 
         if ev.soportes.count() == 0:
             return Response({'ok': False, 'error': 'Debe agregar al menos un soporte antes de enviar.'}, status=400)
+
+        if getattr(ev.accion, 'requiere_codigo_doxa', False) and not ev.codigo_doxa:
+            return Response({'ok': False, 'error': 'Debe registrar el Código Doxa antes de enviar.'}, status=400)
 
         ev.estado = 'enviada'
         ev.observacion_coordinador = None

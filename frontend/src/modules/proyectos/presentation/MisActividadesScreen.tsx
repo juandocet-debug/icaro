@@ -99,6 +99,21 @@ export const MisActividadesScreen: React.FC<Props> = ({ selectedAccionId }) => {
             />
           )}
 
+          {state.selectedAct?.accion?.requiere_codigo_doxa && (
+            <View style={{ marginBottom: spacing.sm }}>
+              <TextField
+                label="Código Doxa *"
+                value={state.evCodigoDoxa}
+                onChangeText={(v) => state.setEvCodigoDoxa(v.replace(/\s+/g, '').toUpperCase())}
+                placeholder="Ej: TOG01C03"
+                autoCapitalize="characters"
+              />
+              <Text style={{ fontFamily: typography.fontFamily, fontSize: 11, color: state.evCodigoDoxaValido ? colors.textSecondary : colors.error, marginTop: -4 }}>
+                Formato esperado: prefijo + G01 + C03, sin espacios.
+              </Text>
+            </View>
+          )}
+
           <TextField
             label="Descripción / Bitácora"
             value={state.evDescripcion}
@@ -131,7 +146,13 @@ export const MisActividadesScreen: React.FC<Props> = ({ selectedAccionId }) => {
             label={state.evModalSaving ? 'Guardando...' : 'Crear Evidencia'}
             onPress={state.handleCreateEvidencia}
             loading={state.evModalSaving}
-            disabled={state.evModalSaving || !state.evNombre || !state.evCantidad || (state.selectedAct?.accion?.requiere_grupos && !state.evGrupoId)}
+            disabled={
+              state.evModalSaving ||
+              !state.evNombre ||
+              !state.evCantidad ||
+              (state.selectedAct?.accion?.requiere_grupos && !state.evGrupoId) ||
+              (state.selectedAct?.accion?.requiere_codigo_doxa && (!state.evCodigoDoxa || !state.evCodigoDoxaValido))
+            }
             style={{ marginTop: spacing.md, backgroundColor: colors.primary }}
           />
         </View>

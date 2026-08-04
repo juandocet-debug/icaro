@@ -2,6 +2,10 @@ import { useState, useEffect, useMemo } from 'react';
 import { asignacionResponsableRepo } from '../../../../shared/dependencies';
 import { api } from '../../../../services/api';
 
+const CODIGO_DOXA_RE = /^[A-Z0-9]{2,6}G\d{2}C\d{2}$/;
+
+export const normalizarCodigoDoxa = (value: string) => value.replace(/\s+/g, '').toUpperCase();
+
 export const useMisActividades = (selectedAccionId?: string) => {
   // Lista de actividades
   const [todasActs, setTodasActs] = useState<any[]>([]);
@@ -34,6 +38,7 @@ export const useMisActividades = (selectedAccionId?: string) => {
   const [evFecha, setEvFecha] = useState('');
   const [evCantidad, setEvCantidad] = useState('');
   const [evGrupoId, setEvGrupoId] = useState('');
+  const [evCodigoDoxa, setEvCodigoDoxa] = useState('');
   const [evModalErr, setEvModalErr] = useState<string | null>(null);
   const [evModalSaving, setEvModalSaving] = useState(false);
 
@@ -175,7 +180,8 @@ export const useMisActividades = (selectedAccionId?: string) => {
   const filteredEvidencias = useMemo(() => {
     return evidencias.filter(ev => {
       if (evQ && !ev.nombre?.toLowerCase().includes(evQ.toLowerCase()) &&
-          !ev.descripcion?.toLowerCase().includes(evQ.toLowerCase())) return false;
+          !ev.descripcion?.toLowerCase().includes(evQ.toLowerCase()) &&
+          !ev.codigo_doxa?.toLowerCase().includes(evQ.toLowerCase())) return false;
       if (evFechaDesde && ev.fecha_ejecucion && ev.fecha_ejecucion < evFechaDesde) return false;
       if (evFechaHasta && ev.fecha_ejecucion && ev.fecha_ejecucion > evFechaHasta) return false;
       return true;
@@ -220,12 +226,19 @@ export const useMisActividades = (selectedAccionId?: string) => {
     setEvDescripcion('');
     setEvFecha(new Date().toISOString().split('T')[0]);
     setEvGrupoId('');
+    setEvCodigoDoxa('');
     setEvModalErr(null);
     setShowEvModal(true);
   };
 
   const handleCreateEvidencia = async () => {
     if (!selectedAct || !evNombre.trim()) return;
+    const requiereCodigoDoxa = !!selectedAct.accion?.requiere_codigo_doxa;
+    const codigoDoxa = normalizarCodigoDoxa(evCodigoDoxa);
+    if (requiereCodigoDoxa && !CODIGO_DOXA_RE.test(codigoDoxa)) {
+      setEvModalErr('Código Doxa inválido. Usa formato TOG01C03, en mayúsculas y sin espacios.');
+      return;
+    }
     setEvModalSaving(true);
     setEvModalErr(null);
     try {
@@ -235,6 +248,7 @@ export const useMisActividades = (selectedAccionId?: string) => {
         fecha_ejecucion: evFecha || null,
         cantidad_ejecutada: evCantidad ? parseFloat(evCantidad) : 0,
         grupo_id: evGrupoId || null,
+        codigo_doxa: codigoDoxa || null,
       });
       setShowEvModal(false);
       await cargarEvidencias(selectedAct.accion.id);
@@ -372,7 +386,9 @@ export const useMisActividades = (selectedAccionId?: string) => {
     evQ, setEvQ, evFechaDesde, setEvFechaDesde, evFechaHasta, setEvFechaHasta,
     filteredEvidencias,
     showEvModal, setShowEvModal, evNombre, setEvNombre, evDescripcion, setEvDescripcion,
-    evFecha, setEvFecha, evCantidad, setEvCantidad, evGrupoId, setEvGrupoId, evModalErr, evModalSaving, openEvModal, handleCreateEvidencia,
+    evFecha, setEvFecha, evCantidad, setEvCantidad, evGrupoId, setEvGrupoId,
+    evCodigoDoxa, setEvCodigoDoxa, evCodigoDoxaValido: !evCodigoDoxa || CODIGO_DOXA_RE.test(normalizarCodigoDoxa(evCodigoDoxa)),
+    evModalErr, evModalSaving, openEvModal, handleCreateEvidencia,
     soporteReqId, setSoporteReqId, soporteFile, setSoporteFile, soporteFileName, setSoporteFileName,
     soporteFecha, setSoporteFecha, soporteObs, setSoporteObs, soporteErr, soporteSaving, handleGuardarSoporte, handleDeleteSoporte, handleEnviarEvidencia,
     reviewObs, setReviewObs, reviewSaving, reviewErr, handleReviewEvidencia, handleReabrirEvidencia,

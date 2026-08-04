@@ -277,6 +277,9 @@ export const MisActividadesMobileScreen: React.FC<MisActividadesMobileScreenProp
     try {
       let evId = state.activeEv?.id;
       if (!evId) {
+        if (cargarSoporteAct.accion?.requiere_codigo_doxa) {
+          throw new Error('Esta actividad requiere Código Doxa. Crea la evidencia y registra el código antes de subir soporte.');
+        }
         const tiposPermitidos: string[] = cargarSoporteAct.accion?.tipos_evidencia_permitidos || [];
         const evNombre = tiposPermitidos.length > 0 ? tiposPermitidos[0] : (cargarSoporteReq.nombre || 'Evidencia');
         state.setEvNombre(evNombre);
@@ -1035,6 +1038,26 @@ export const MisActividadesMobileScreen: React.FC<MisActividadesMobileScreenProp
               />
             )}
 
+            {state.selectedAct?.accion?.requiere_codigo_doxa && (
+              <View style={{ marginBottom: spacing.sm }}>
+                <Text style={styles.labelField}>Código Doxa *</Text>
+                <TextInput
+                  style={[
+                    styles.textInputField,
+                    state.evCodigoDoxa && !state.evCodigoDoxaValido ? { borderColor: colors.error } : null,
+                  ]}
+                  value={state.evCodigoDoxa}
+                  onChangeText={(v) => state.setEvCodigoDoxa(v.replace(/\s+/g, '').toUpperCase())}
+                  placeholder="Ej: TOG01C03"
+                  placeholderTextColor="#94a3b8"
+                  autoCapitalize="characters"
+                />
+                <Text style={{ fontSize: 11, color: state.evCodigoDoxaValido ? '#64748b' : colors.error, fontFamily: typography.fontFamily }}>
+                  Formato esperado: prefijo + G01 + C03, sin espacios.
+                </Text>
+              </View>
+            )}
+
             <Text style={styles.labelField}>Descripción / Bitácora</Text>
             <TextInput
               style={styles.textInputField}
@@ -1116,9 +1139,9 @@ export const MisActividadesMobileScreen: React.FC<MisActividadesMobileScreenProp
             {!!state.evModalErr && <ErrorMessage message={state.evModalErr} />}
 
             <TouchableOpacity 
-              style={[styles.sheetSubmitBtn, (!state.evNombre || !state.evCantidad || (state.selectedAct?.accion?.requiere_grupos && !state.evGrupoId)) && { opacity: 0.5 }]}
+              style={[styles.sheetSubmitBtn, (!state.evNombre || !state.evCantidad || (state.selectedAct?.accion?.requiere_grupos && !state.evGrupoId) || (state.selectedAct?.accion?.requiere_codigo_doxa && (!state.evCodigoDoxa || !state.evCodigoDoxaValido))) && { opacity: 0.5 }]}
               onPress={state.handleCreateEvidencia}
-              disabled={state.evModalSaving || !state.evNombre || !state.evCantidad || (state.selectedAct?.accion?.requiere_grupos && !state.evGrupoId)}
+              disabled={state.evModalSaving || !state.evNombre || !state.evCantidad || (state.selectedAct?.accion?.requiere_grupos && !state.evGrupoId) || (state.selectedAct?.accion?.requiere_codigo_doxa && (!state.evCodigoDoxa || !state.evCodigoDoxaValido))}
             >
               <Text style={styles.sheetSubmitTxt}>
                 {state.evModalSaving ? 'Creando...' : 'Crear Evidencia'}

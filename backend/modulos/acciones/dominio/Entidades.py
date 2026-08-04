@@ -21,6 +21,7 @@ class Accion:
     start_date: Optional[date] = None
     end_date: Optional[date] = None
     requiere_grupos: bool = False
+    requiere_codigo_doxa: bool = False
 
     @classmethod
     def crear(cls, componente_id: str, name: str, **kwargs) -> 'Accion':

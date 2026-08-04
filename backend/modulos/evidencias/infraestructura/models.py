@@ -35,6 +35,7 @@ class EvidenciaActividadModel(models.Model):
     fecha_ejecucion = models.DateField(blank=True, null=True)
     cantidad_ejecutada = models.DecimalField(max_digits=15, decimal_places=2, default=0)
     estado = models.CharField(max_length=16, choices=ESTADOS, default='borrador', db_index=True)
+    codigo_doxa = models.CharField(max_length=16, blank=True, null=True, db_index=True)
     observacion_coordinador = models.TextField(blank=True, null=True)
     revisada_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, blank=True, null=True, related_name='evidencias_revisadas')
     created_at = models.DateTimeField(auto_now_add=True)
@@ -52,4 +53,3 @@ class EvidenciaActividadModel(models.Model):
             models.Index(fields=['creada_por', 'created_at'], name='evact_user_created_idx'),
             models.Index(fields=['grupo', 'created_at'], name='evact_grupo_created_idx'),
         ]
-

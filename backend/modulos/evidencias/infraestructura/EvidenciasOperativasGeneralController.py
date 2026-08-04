@@ -88,6 +88,7 @@ def _serialize_evidencia_general(ev):
         'fecha_ejecucion': str(ev.fecha_ejecucion) if ev.fecha_ejecucion else None,
         'cantidad_ejecutada': float(ev.cantidad_ejecutada),
         'estado': ev.estado,
+        'codigo_doxa': ev.codigo_doxa,
         'observacion_coordinador': ev.observacion_coordinador,
         'creada_por': {
             'id': str(ev.creada_por_id),

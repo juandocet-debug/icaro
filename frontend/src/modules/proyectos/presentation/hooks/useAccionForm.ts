@@ -56,6 +56,7 @@ export function useAccionForm(componenteId: string, proyectoId: string) {
   const [endDate,     setEndDate]     = useState('');
   const [requisitos,  setRequisitos]  = useState<ReqDraft[]>([]);
   const [requiereGrupos, setRequiereGrupos] = useState(false);
+  const [requiereCodigoDoxa, setRequiereCodigoDoxa] = useState(false);
   const [gruposDraft,    setGruposDraft]    = useState<GrupoDraft[]>([]);
   const [grupoNombre,    setGrupoNombre]    = useState('');
   const [grupoCodigo,    setGrupoCodigo]    = useState('');
@@ -76,6 +77,7 @@ export function useAccionForm(componenteId: string, proyectoId: string) {
     setRequisitos([]); setTiposEvidencia([]); setTipoEvInput(''); setError(null);
     setSelectedUserId(''); setTipoAsig('responsable'); setSeleccionados([]);
     setStartDate(''); setEndDate(''); setRequiereGrupos(false);
+    setRequiereCodigoDoxa(false);
     setGruposDraft([]); setGrupoNombre(''); setGrupoCodigo('');
   };
 
@@ -183,6 +185,7 @@ export function useAccionForm(componenteId: string, proyectoId: string) {
         startDate: startDate || null,
         endDate: endDate || null,
         requiereGrupos,
+        requiereCodigoDoxa,
       });
 
       // ── Guardar grupos borradores después de crear la acción ─────────────────
@@ -226,6 +229,7 @@ export function useAccionForm(componenteId: string, proyectoId: string) {
     unidad, setUnidad, proyeccion, setProyeccion,
     startDate, setStartDate, endDate, setEndDate,
     requisitos, requiereGrupos, setRequiereGrupos, tiposEvidencia, tipoEvInput, setTipoEvInput,
+    requiereCodigoDoxa, setRequiereCodigoDoxa,
     saving, error,
     // Grupos borrador
     gruposDraft, grupoNombre, setGrupoNombre, grupoCodigo, setGrupoCodigo,

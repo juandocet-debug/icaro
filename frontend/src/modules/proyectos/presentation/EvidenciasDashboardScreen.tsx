@@ -34,6 +34,7 @@ interface EvidenciaGeneral {
   fecha_ejecucion: string | null;
   cantidad_ejecutada: number;
   estado: string;
+  codigo_doxa?: string | null;
   observacion_coordinador: string | null;
   creada_por: {
     id: string;
@@ -360,8 +361,9 @@ export const EvidenciasDashboardScreen: React.FC<Props> = ({ proyectoId }) => {
         const query = searchQuery.toLowerCase();
         const matchesColab = ev.creada_por?.nombre?.toLowerCase().includes(query);
         const matchesAccion = ev.accion?.nombre?.toLowerCase().includes(query);
+        const matchesCodigo = ev.codigo_doxa?.toLowerCase().includes(query);
         const matchesEv = ev.nombre?.toLowerCase().includes(query) || ev.descripcion?.toLowerCase().includes(query);
-        if (!matchesColab && !matchesAccion && !matchesEv) return false;
+        if (!matchesColab && !matchesAccion && !matchesCodigo && !matchesEv) return false;
       }
       if (selectedEstado === 'todos') {
         if (ev.estado === 'borrador') return false;
@@ -848,6 +850,13 @@ export const EvidenciasDashboardScreen: React.FC<Props> = ({ proyectoId }) => {
                           <Text style={{ fontFamily: typography.fontFamily, fontSize: 13, fontWeight: '700', color: colors.textPrimary }} numberOfLines={1}>
                             {ev.nombre}
                           </Text>
+                          {!!ev.codigo_doxa && (
+                            <View style={{ alignSelf: 'flex-start', marginTop: 3, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, backgroundColor: '#ecfdf5', borderWidth: 1, borderColor: '#bbf7d0' } as any}>
+                              <Text style={{ fontFamily: typography.fontFamily, fontSize: 10, color: '#047857', fontWeight: '800', letterSpacing: 0.4 }}>
+                                {ev.codigo_doxa}
+                              </Text>
+                            </View>
+                          )}
                           {ev.grupo && (
                             <Text style={{ fontFamily: typography.fontFamily, fontSize: 10, color: '#1d4ed8', fontWeight: '600', marginTop: 2 }}>
                               Grupo: {ev.grupo.nombre} {ev.grupo.codigo ? `(${ev.grupo.codigo})` : ''}
@@ -943,7 +952,16 @@ export const EvidenciasDashboardScreen: React.FC<Props> = ({ proyectoId }) => {
                       return (
                         <View style={styles.expandedDrawer}>
                           <View style={styles.drawerHeader}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 } as any}>
                             <Text style={styles.drawerTitle}>Lista de Requisitos de Verificación</Text>
+                              {!!ev.codigo_doxa && (
+                                <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, backgroundColor: '#ecfdf5', borderWidth: 1, borderColor: '#bbf7d0' } as any}>
+                                  <Text style={{ fontFamily: typography.fontFamily, fontSize: 10, color: '#047857', fontWeight: '800', letterSpacing: 0.4 }}>
+                                    {ev.codigo_doxa}
+                                  </Text>
+                                </View>
+                              )}
+                            </View>
                             <View style={styles.drawerCountBadge}>
                               <Text style={styles.drawerCountBadgeText}>{ev.soportes.length} archivos</Text>
                             </View>

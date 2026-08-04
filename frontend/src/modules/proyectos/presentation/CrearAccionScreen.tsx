@@ -81,6 +81,7 @@ export const CrearAccionScreen: React.FC<Props> = ({ componenteId, proyectoId })
     unidad, setUnidad, proyeccion, setProyeccion,
     startDate, setStartDate, endDate, setEndDate,
     requisitos, requiereGrupos, setRequiereGrupos, tiposEvidencia, tipoEvInput, setTipoEvInput,
+    requiereCodigoDoxa, setRequiereCodigoDoxa,
     saving, error,
     gruposDraft, grupoNombre, setGrupoNombre, grupoCodigo, setGrupoCodigo,
     addGrupoDraft, removeGrupoDraft,
@@ -181,6 +182,23 @@ export const CrearAccionScreen: React.FC<Props> = ({ componenteId, proyectoId })
                   onValueChange={setRequiereGrupos}
                   trackColor={{ false: '#d1d5db', true: '#3b82f6' }}
                   thumbColor={requiereGrupos ? '#ffffff' : '#f4f3f4'}
+                />
+              </View>
+
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: colors.border, pt: spacing.md, marginTop: spacing.md, paddingTop: spacing.md }}>
+                <View style={{ flex: 1, marginRight: spacing.md }}>
+                  <Text style={{ fontFamily: typography.fontFamily, fontSize: typography.sizes.sm, color: colors.textPrimary, fontWeight: '700' }}>
+                    Esta acción requiere Código Doxa
+                  </Text>
+                  <Text style={{ fontFamily: typography.fontFamily, fontSize: 12, color: colors.textSecondary, marginTop: 2 }}>
+                    Si se activa, el profesional deberá escribir el código generado en Doxa, por ejemplo TOG01C03.
+                  </Text>
+                </View>
+                <Switch
+                  value={requiereCodigoDoxa}
+                  onValueChange={setRequiereCodigoDoxa}
+                  trackColor={{ false: '#d1d5db', true: '#10b981' }}
+                  thumbColor={requiereCodigoDoxa ? '#ffffff' : '#f4f3f4'}
                 />
               </View>
             </View>

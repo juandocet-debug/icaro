@@ -161,6 +161,13 @@ export const EvidenciaDetailModal = ({
             Grupo: {activeEv.grupo.nombre} {activeEv.grupo.codigo ? `(${activeEv.grupo.codigo})` : ''}
           </Text>
         )}
+        {!!activeEv.codigo_doxa && (
+          <View style={{ alignSelf: 'flex-start', marginTop: 6, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, backgroundColor: '#ecfdf5', borderWidth: 1, borderColor: '#bbf7d0' } as any}>
+            <Text style={{ fontFamily: typography.fontFamily, fontSize: 11, color: '#047857', fontWeight: '800', letterSpacing: 0.4 }}>
+              Código Doxa: {activeEv.codigo_doxa}
+            </Text>
+          </View>
+        )}
         {!!activeEv.observacion_coordinador && (
           <View style={styles.activeEvObsBox}>
             <Text style={styles.activeEvObsTitle}>Observación de Coordinación:</Text>

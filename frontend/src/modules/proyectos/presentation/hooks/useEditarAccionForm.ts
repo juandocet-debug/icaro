@@ -33,6 +33,7 @@ export function useEditarAccionForm(componenteId: string, accionId: string) {
   const [endDate,     setEndDate]     = useState('');
   const [requisitos,  setRequisitos]  = useState<ReqDraftEditar[]>([]);
   const [requiereGrupos, setRequiereGrupos] = useState(false);
+  const [requiereCodigoDoxa, setRequiereCodigoDoxa] = useState(false);
   const [tiposEvidencia,  setTiposEvidencia]  = useState<string[]>([]);
   const [tipoEvInput,     setTipoEvInput]     = useState('');
   const [tiposEvTouched,  setTiposEvTouched]  = useState(false);
@@ -71,6 +72,7 @@ export function useEditarAccionForm(componenteId: string, accionId: string) {
         setStartDate(d.start_date || '');
         setEndDate(d.end_date || '');
         setRequiereGrupos(d.requiere_grupos || false);
+        setRequiereCodigoDoxa(d.requiere_codigo_doxa || false);
         setRequisitos(
           (d.requisitos_verificacion ?? []).map((r: any, i: number) => ({
             id: r.id, nombre: r.nombre, descripcion: r.descripcion ?? null,
@@ -165,6 +167,7 @@ export function useEditarAccionForm(componenteId: string, accionId: string) {
         startDate: startDate || null,
         endDate: endDate || null,
         requiereGrupos,
+        requiereCodigoDoxa,
       } as any);
       await api.put(
         `/api/acciones/${componenteId}/acciones/${accionId}/requisitos/`,
@@ -187,6 +190,7 @@ export function useEditarAccionForm(componenteId: string, accionId: string) {
     unidad, setUnidad, proyeccion, setProyeccion,
     startDate, setStartDate, endDate, setEndDate,
     requisitos, requiereGrupos, setRequiereGrupos, tiposEvidencia, tipoEvInput, setTipoEvInput,
+    requiereCodigoDoxa, setRequiereCodigoDoxa,
     saving, error, loadingData,
     asignados, opcionesAsignables, selectedUserId, setSelectedUserId,
     tipoAsig, setTipoAsig,

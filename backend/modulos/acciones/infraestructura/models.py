@@ -25,6 +25,10 @@ class AccionModel(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     requiere_grupos = models.BooleanField(default=False)
+    requiere_codigo_doxa = models.BooleanField(
+        default=False,
+        help_text='Si está activo, cada evidencia operativa debe registrar el código generado en Doxa.',
+    )
 
     class Meta:
         app_label = 'acciones'

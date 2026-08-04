@@ -42,6 +42,7 @@ type ApiAccion = {
   start_date?: string | null;
   end_date?: string | null;
   requiere_grupos?: boolean;
+  requiere_codigo_doxa?: boolean;
 };
 
 const mapMeta = (d: ApiMeta): Meta => ({
@@ -89,6 +90,7 @@ const mapAccion = (d: ApiAccion): Accion => ({
   startDate: d.start_date ?? null,
   endDate: d.end_date ?? null,
   requiereGrupos: d.requiere_grupos,
+  requiereCodigoDoxa: d.requiere_codigo_doxa,
 });
 
 export class AxiosMetaRepository implements MetaRepositoryPort {
@@ -165,6 +167,7 @@ export class AxiosMetaRepository implements MetaRepositoryPort {
     startDate?: string | null;
     endDate?: string | null;
     requiereGrupos?: boolean;
+    requiereCodigoDoxa?: boolean;
   }): Promise<Accion> {
     const res = await api.post<{ ok: boolean; datos: ApiAccion }>(
       `/api/acciones/${componenteId}/acciones/`,
@@ -179,6 +182,7 @@ export class AxiosMetaRepository implements MetaRepositoryPort {
         start_date: datos.startDate ?? null,
         end_date: datos.endDate ?? null,
         requiere_grupos: datos.requiereGrupos ?? false,
+        requiere_codigo_doxa: datos.requiereCodigoDoxa ?? false,
       }
     );
     return mapAccion(res.data.datos);
@@ -207,6 +211,7 @@ export class AxiosMetaRepository implements MetaRepositoryPort {
     startDate?: string | null;
     endDate?: string | null;
     requiereGrupos?: boolean;
+    requiereCodigoDoxa?: boolean;
   }): Promise<Accion> {
     const payload: any = {};
     if (datos.nombre !== undefined) payload.name = datos.nombre;
@@ -217,6 +222,7 @@ export class AxiosMetaRepository implements MetaRepositoryPort {
     if (datos.startDate !== undefined) payload.start_date = datos.startDate;
     if (datos.endDate !== undefined) payload.end_date = datos.endDate;
     if (datos.requiereGrupos !== undefined) payload.requiere_grupos = datos.requiereGrupos;
+    if (datos.requiereCodigoDoxa !== undefined) payload.requiere_codigo_doxa = datos.requiereCodigoDoxa;
     const res = await api.put<{ ok: boolean; datos: ApiAccion }>(
       `/api/acciones/${compId}/acciones/${accionId}/`,
       payload
