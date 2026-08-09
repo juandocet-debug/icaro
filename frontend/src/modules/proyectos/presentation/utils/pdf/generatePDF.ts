@@ -11,8 +11,6 @@ import { getSharedCss, portadaHtml, evidenciaPageHtml, fotosPageHtml, planSesion
 import { LOGO_SUPERIOR_B64, LOGO_INFERIOR_B64 } from './pdfLogos';
 import { env } from '../../../../../config/env';
 
-const MAX_EVIDENCIAS = 20;
-
 const toAbsUrl = (url: string) =>
   !url ? '' : url.startsWith('http') ? url : `${(env as any).apiUrl ?? ''}${url}`;
 
@@ -31,7 +29,9 @@ export async function generateEvidenciasPDF(params: PDFParams): Promise<string |
   }
 
   const { proyectoNombre, metaNombre, componenteNombre, accionNombre, grupoNombre, evidencias } = params;
-  const evs = evidencias.slice(0, MAX_EVIDENCIAS);
+  // El reporte debe respetar exactamente el resultado de los filtros.
+  // No truncar silenciosamente: antes se exportaban solo las primeras 20.
+  const evs = evidencias;
 
   // ── 1. Recopilar URLs de imágenes distinguiendo tipo ─────────────────────
   type ImgRef = { evIdx: number; sIdx: number; url: string; label: string; isAsis: boolean; isPlan: boolean };

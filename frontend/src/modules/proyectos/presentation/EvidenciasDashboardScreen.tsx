@@ -221,16 +221,24 @@ export const EvidenciasDashboardScreen: React.FC<Props> = ({ proyectoId }) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await api.get(
-        `/api/evidencias/proyecto/${proyectoId}/evidencias-operativas-general/?page=1&page_size=${DASHBOARD_FETCH_LIMIT}`
-      );
-      if (res.data.ok) {
-        setEvidencias(res.data.datos || []);
-      } else {
-        setError(res.data.error || 'No se pudieron cargar las evidencias.');
+      const todas: EvidenciaGeneral[] = [];
+      let page = 1;
+      let haySiguiente = true;
+
+      while (haySiguiente) {
+        const res = await api.get(
+          `/api/evidencias/proyecto/${proyectoId}/evidencias-operativas-general/?page=${page}&page_size=${DASHBOARD_FETCH_LIMIT}`
+        );
+        if (!res.data.ok) {
+          throw new Error(res.data.error || 'No se pudieron cargar las evidencias.');
+        }
+        todas.push(...(res.data.datos || []));
+        haySiguiente = Boolean(res.data.next);
+        page += 1;
       }
+      setEvidencias(todas);
     } catch (e: any) {
-      setError(e?.response?.data?.error || 'Error de red al cargar el dashboard.');
+      setError(e?.response?.data?.error || e?.message || 'Error de red al cargar el dashboard.');
     } finally {
       setLoading(false);
     }
