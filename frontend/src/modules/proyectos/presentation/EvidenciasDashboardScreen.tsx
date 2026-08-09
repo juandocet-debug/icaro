@@ -119,9 +119,8 @@ export const EvidenciasDashboardScreen: React.FC<Props> = ({ proyectoId }) => {
 
   const selectedAccionId = useMemo(() => {
     if (selectedAccion === 'todos') return null;
-    const match = evidencias.find(ev => ev.accion?.nombre === selectedAccion);
-    return match?.accion?.id || null;
-  }, [selectedAccion, evidencias]);
+    return selectedAccion;
+  }, [selectedAccion]);
 
   useEffect(() => {
     setSelectedGrupoId(null);
@@ -252,7 +251,7 @@ export const EvidenciasDashboardScreen: React.FC<Props> = ({ proyectoId }) => {
     evidencias.forEach(ev => {
       if (selectedEstado !== 'todos' && ev.estado !== selectedEstado) return;
       if (selectedMeta !== 'todos' && ev.accion?.meta_nombre !== selectedMeta) return;
-      if (selectedAccion !== 'todos' && ev.accion?.nombre !== selectedAccion) return;
+      if (selectedAccion !== 'todos' && ev.accion?.id !== selectedAccion) return;
       if (fechaDesde && ev.fecha_ejecucion && ev.fecha_ejecucion < fechaDesde) return;
       if (fechaHasta && ev.fecha_ejecucion && ev.fecha_ejecucion > fechaHasta) return;
       if (ev.creada_por?.nombre) {
@@ -287,7 +286,7 @@ export const EvidenciasDashboardScreen: React.FC<Props> = ({ proyectoId }) => {
       if (selectedEstado !== 'todos' && ev.estado !== selectedEstado) return;
       if (selectedColaborador !== 'todos' && ev.creada_por?.nombre !== selectedColaborador) return;
       if (selectedComponente !== 'todos' && ev.accion?.componente_nombre !== selectedComponente) return;
-      if (selectedAccion !== 'todos' && ev.accion?.nombre !== selectedAccion) return;
+      if (selectedAccion !== 'todos' && ev.accion?.id !== selectedAccion) return;
       if (fechaDesde && ev.fecha_ejecucion && ev.fecha_ejecucion < fechaDesde) return;
       if (fechaHasta && ev.fecha_ejecucion && ev.fecha_ejecucion > fechaHasta) return;
       if (ev.accion?.meta_nombre) {
@@ -304,7 +303,7 @@ export const EvidenciasDashboardScreen: React.FC<Props> = ({ proyectoId }) => {
       if (selectedEstado !== 'todos' && ev.estado !== selectedEstado) return;
       if (selectedColaborador !== 'todos' && ev.creada_por?.nombre !== selectedColaborador) return;
       if (selectedMeta !== 'todos' && ev.accion?.meta_nombre !== selectedMeta) return;
-      if (selectedAccion !== 'todos' && ev.accion?.nombre !== selectedAccion) return;
+      if (selectedAccion !== 'todos' && ev.accion?.id !== selectedAccion) return;
       if (fechaDesde && ev.fecha_ejecucion && ev.fecha_ejecucion < fechaDesde) return;
       if (fechaHasta && ev.fecha_ejecucion && ev.fecha_ejecucion > fechaHasta) return;
       if (ev.accion?.componente_nombre) {
@@ -316,7 +315,7 @@ export const EvidenciasDashboardScreen: React.FC<Props> = ({ proyectoId }) => {
 
   // Lista única de acciones/actividades (Filtro Inteligente)
   const acciones = useMemo(() => {
-    const names = new Set<string>();
+    const opciones = new Map<string, string>();
     evidencias.forEach(ev => {
       if (selectedEstado !== 'todos' && ev.estado !== selectedEstado) return;
       if (selectedColaborador !== 'todos' && ev.creada_por?.nombre !== selectedColaborador) return;
@@ -324,11 +323,12 @@ export const EvidenciasDashboardScreen: React.FC<Props> = ({ proyectoId }) => {
       if (selectedComponente !== 'todos' && ev.accion?.componente_nombre !== selectedComponente) return;
       if (fechaDesde && ev.fecha_ejecucion && ev.fecha_ejecucion < fechaDesde) return;
       if (fechaHasta && ev.fecha_ejecucion && ev.fecha_ejecucion > fechaHasta) return;
-      if (ev.accion?.nombre) {
-        names.add(ev.accion.nombre);
+      if (ev.accion?.id && ev.accion?.nombre) {
+        opciones.set(ev.accion.id, ev.accion.nombre);
       }
     });
-    return Array.from(names).sort();
+    return Array.from(opciones, ([id, nombre]) => ({ id, nombre }))
+      .sort((a, b) => a.nombre.localeCompare(b.nombre));
   }, [evidencias, selectedEstado, selectedColaborador, selectedMeta, selectedComponente, fechaDesde, fechaHasta]);
 
   // Lista única de estados disponibles (Filtro Inteligente)
@@ -337,7 +337,7 @@ export const EvidenciasDashboardScreen: React.FC<Props> = ({ proyectoId }) => {
     evidencias.forEach(ev => {
       if (selectedColaborador !== 'todos' && ev.creada_por?.nombre !== selectedColaborador) return;
       if (selectedMeta !== 'todos' && ev.accion?.meta_nombre !== selectedMeta) return;
-      if (selectedAccion !== 'todos' && ev.accion?.nombre !== selectedAccion) return;
+      if (selectedAccion !== 'todos' && ev.accion?.id !== selectedAccion) return;
       if (fechaDesde && ev.fecha_ejecucion && ev.fecha_ejecucion < fechaDesde) return;
       if (fechaHasta && ev.fecha_ejecucion && ev.fecha_ejecucion > fechaHasta) return;
       if (ev.estado) {
@@ -380,7 +380,7 @@ export const EvidenciasDashboardScreen: React.FC<Props> = ({ proyectoId }) => {
       if (selectedColaborador !== 'todos' && ev.creada_por?.nombre !== selectedColaborador) return false;
       if (selectedMeta !== 'todos' && ev.accion?.meta_nombre !== selectedMeta) return false;
       if (selectedComponente !== 'todos' && ev.accion?.componente_nombre !== selectedComponente) return false;
-      if (selectedAccion !== 'todos' && ev.accion?.nombre !== selectedAccion) return false;
+      if (selectedAccion !== 'todos' && ev.accion?.id !== selectedAccion) return false;
       if (selectedGrupoId && (!ev.grupo || ev.grupo.id !== selectedGrupoId)) return false;
       if (fechaDesde && ev.fecha_ejecucion && ev.fecha_ejecucion < fechaDesde) return false;
       if (fechaHasta && ev.fecha_ejecucion && ev.fecha_ejecucion > fechaHasta) return false;
@@ -550,7 +550,9 @@ export const EvidenciasDashboardScreen: React.FC<Props> = ({ proyectoId }) => {
     // Meta, componente y acción: si el filtro tiene uno específico, úsalo
     const metaNombre       = selectedMeta       !== 'todos' ? selectedMeta       : 'Todas las metas';
     const componenteNombre = selectedComponente !== 'todos' ? selectedComponente : '';
-    const accionNombre     = selectedAccion     !== 'todos' ? selectedAccion     : 'Reporte General de Evidencias';
+    const accionNombre = selectedAccion !== 'todos'
+      ? (evidencias.find(ev => ev.accion?.id === selectedAccion)?.accion?.nombre ?? 'Acción seleccionada')
+      : 'Reporte General de Evidencias';
 
     // Grupo: si hay un grupo seleccionado, tomar su nombre de las evidencias
     const grupoNombre = selectedGrupoId
@@ -683,7 +685,12 @@ export const EvidenciasDashboardScreen: React.FC<Props> = ({ proyectoId }) => {
                 <select
                   style={htmlSelectStyle}
                   value={selectedMeta}
-                  onChange={(e: any) => setSelectedMeta(e.target.value)}
+                  onChange={(e: any) => {
+                    setSelectedMeta(e.target.value);
+                    setSelectedComponente('todos');
+                    setSelectedAccion('todos');
+                    setSelectedGrupoId(null);
+                  }}
                 >
                   <option value="todos">Todas las metas</option>
                   {metas.map(name => (
@@ -703,7 +710,11 @@ export const EvidenciasDashboardScreen: React.FC<Props> = ({ proyectoId }) => {
                 <select
                   style={htmlSelectStyle}
                   value={selectedComponente}
-                  onChange={(e: any) => setSelectedComponente(e.target.value)}
+                  onChange={(e: any) => {
+                    setSelectedComponente(e.target.value);
+                    setSelectedAccion('todos');
+                    setSelectedGrupoId(null);
+                  }}
                 >
                   <option value="todos">Todos los componentes</option>
                   {componentes.map(name => (
@@ -726,8 +737,8 @@ export const EvidenciasDashboardScreen: React.FC<Props> = ({ proyectoId }) => {
                   onChange={(e: any) => setSelectedAccion(e.target.value)}
                 >
                   <option value="todos">Todas las acciones</option>
-                  {acciones.map(name => (
-                    <option key={name} value={name}>{name}</option>
+                  {acciones.map(accion => (
+                    <option key={accion.id} value={accion.id}>{accion.nombre}</option>
                   ))}
                 </select>
               ) : null}
