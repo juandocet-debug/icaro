@@ -167,6 +167,19 @@ def test_evidencias_requiere_grupos_validation(api_client, superuser, action_req
     assert res.data['datos']['grupo']['id'] == str(grupo1.id)
     assert res.data['datos']['codigo_doxa'] == 'TOG01C03'
 
+    # El código queda reservado globalmente, incluso para otra acción.
+    res_dup_global = api_client.post(
+        f'/api/mis-actividades/{action_no_groups.id}/evidencias-operativas/',
+        data={
+            'nombre': 'Clase duplicada',
+            'cantidad_ejecutada': 1.0,
+            'codigo_doxa': 'tog01c03',
+        },
+        format='json',
+    )
+    assert res_dup_global.status_code == 400
+    assert 'ya existe en el sistema' in res_dup_global.data['error']
+
     # 4. Post evidence on action_no_groups without group_id -> should succeed
     url_ev_no_req = f'/api/mis-actividades/{action_no_groups.id}/evidencias-operativas/'
     res = api_client.post(url_ev_no_req, data={
@@ -217,7 +230,8 @@ def test_filtering_and_components_search(api_client, superuser, project, compone
         accion=action_no_groups,
         creada_por=superuser,
         nombre="Ev2",
-        cantidad_ejecutada=2.0
+        cantidad_ejecutada=2.0,
+        codigo_doxa='TOG01C03',
     )
 
     # 1. Filter general evidences by group_id
@@ -227,6 +241,15 @@ def test_filtering_and_components_search(api_client, superuser, project, compone
     assert len(res.data['datos']) == 1
     assert res.data['datos'][0]['id'] == str(ev1.id)
     assert res.data['datos'][0]['codigo_doxa'] == 'TOG01C03'
+    assert res.data['datos'][0]['codigo_doxa_etiqueta'] == 'TOG01C03 A'
+
+    res_todas = api_client.get(url_general)
+    etiquetas = {
+        item['codigo_doxa_etiqueta']
+        for item in res_todas.data['datos']
+        if item['codigo_doxa'] == 'TOG01C03'
+    }
+    assert etiquetas == {'TOG01C03 A', 'TOG01C03 B'}
 
     # 2. Filter actions by requiere_grupos
     url_actions = f'/api/acciones/{component.id}/acciones/'

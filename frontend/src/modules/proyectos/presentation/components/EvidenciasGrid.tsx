@@ -179,7 +179,7 @@ export const EvidenciasGrid = ({
               {!!e.codigo_doxa && (
                 <View style={{ alignSelf: 'flex-start', marginTop: 8, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, backgroundColor: e.codigo_doxa_duplicado ? '#fef2f2' : 'rgba(255,255,255,0.18)', borderWidth: 1, borderColor: e.codigo_doxa_duplicado ? '#fca5a5' : 'rgba(255,255,255,0.28)' } as any}>
                   <Text style={{ fontFamily: typography.fontFamily, fontSize: 10, color: e.codigo_doxa_duplicado ? '#dc2626' : '#ffffff', fontWeight: '800', letterSpacing: 0.4 }}>
-                    {e.codigo_doxa}
+                    {e.codigo_doxa_etiqueta || e.codigo_doxa}
                   </Text>
                 </View>
               )}

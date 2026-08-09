@@ -35,6 +35,7 @@ interface EvidenciaGeneral {
   cantidad_ejecutada: number;
   estado: string;
   codigo_doxa?: string | null;
+  codigo_doxa_etiqueta?: string | null;
   codigo_doxa_duplicado?: boolean;
   observacion_coordinador: string | null;
   creada_por: {
@@ -879,7 +880,7 @@ export const EvidenciasDashboardScreen: React.FC<Props> = ({ proyectoId }) => {
                           {!!ev.codigo_doxa && (
                             <View style={{ alignSelf: 'flex-start', marginTop: 3, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, backgroundColor: ev.codigo_doxa_duplicado ? '#fef2f2' : '#ecfdf5', borderWidth: 1, borderColor: ev.codigo_doxa_duplicado ? '#fca5a5' : '#bbf7d0' } as any}>
                               <Text style={{ fontFamily: typography.fontFamily, fontSize: 10, color: ev.codigo_doxa_duplicado ? '#dc2626' : '#047857', fontWeight: '800', letterSpacing: 0.4 }}>
-                                {ev.codigo_doxa}
+                                {ev.codigo_doxa_etiqueta || ev.codigo_doxa}
                               </Text>
                             </View>
                           )}
@@ -984,7 +985,7 @@ export const EvidenciasDashboardScreen: React.FC<Props> = ({ proyectoId }) => {
                               {!!ev.codigo_doxa && (
                                 <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, backgroundColor: ev.codigo_doxa_duplicado ? '#fef2f2' : '#ecfdf5', borderWidth: 1, borderColor: ev.codigo_doxa_duplicado ? '#fca5a5' : '#bbf7d0' } as any}>
                                   <Text style={{ fontFamily: typography.fontFamily, fontSize: 10, color: ev.codigo_doxa_duplicado ? '#dc2626' : '#047857', fontWeight: '800', letterSpacing: 0.4 }}>
-                                    {ev.codigo_doxa}
+                                    {ev.codigo_doxa_etiqueta || ev.codigo_doxa}
                                   </Text>
                                 </View>
                               )}

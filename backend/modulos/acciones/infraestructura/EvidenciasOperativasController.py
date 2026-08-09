@@ -1,13 +1,13 @@
 import re
 
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 
-from modulos.evidencias.infraestructura.models import EvidenciaActividadModel
+from modulos.evidencias.infraestructura.models import CodigoDoxaRegistradoModel, EvidenciaActividadModel
 from modulos.uploads.infraestructura.models import UploadModel
 from modulos.uploads.infraestructura.InspectorArchivoEvidencia import detectar_mime, resolver_mime_zip, inspeccionar
 from modulos.acciones.infraestructura.models import RequisitoVerificacionAccionModel
@@ -28,16 +28,40 @@ def _validar_codigo_doxa(value, requerido=False):
     return codigo
 
 
-def _codigo_doxa_ya_existe(accion_id, codigo, excluir_id=None):
+def _codigo_doxa_ya_existe(codigo, excluir_id=None):
     if not codigo:
         return False
-    qs = EvidenciaActividadModel.objects.filter(
-        accion_id=accion_id,
-        codigo_doxa__iexact=codigo,
-    )
+    qs = EvidenciaActividadModel.objects.filter(codigo_doxa__iexact=codigo)
     if excluir_id:
         qs = qs.exclude(id=excluir_id)
     return qs.exists()
+
+
+def _reservar_codigo_doxa(codigo):
+    if not codigo:
+        return True
+    try:
+        # El savepoint permite responder limpiamente si dos usuarios intentan
+        # reservar el mismo código de forma simultánea.
+        with transaction.atomic():
+            CodigoDoxaRegistradoModel.objects.create(codigo=codigo)
+        return True
+    except IntegrityError:
+        return False
+
+
+def _etiqueta_codigo_doxa(ev):
+    if not ev.codigo_doxa or not getattr(ev, 'codigo_doxa_duplicado', False):
+        return ev.codigo_doxa
+    ids = list(EvidenciaActividadModel.objects.filter(
+        codigo_doxa__iexact=ev.codigo_doxa,
+    ).order_by('created_at', 'id').values_list('id', flat=True))
+    try:
+        posicion = ids.index(ev.id)
+    except ValueError:
+        return ev.codigo_doxa
+    sufijo = chr(ord('A') + posicion) if posicion < 26 else str(posicion + 1)
+    return f'{ev.codigo_doxa} {sufijo}'
 
 
 def _s_soporte(u):
@@ -72,6 +96,7 @@ def _s_evidencia(ev):
         'cantidad_ejecutada': float(ev.cantidad_ejecutada),
         'estado': ev.estado,
         'codigo_doxa': ev.codigo_doxa,
+        'codigo_doxa_etiqueta': _etiqueta_codigo_doxa(ev),
         'codigo_doxa_duplicado': bool(getattr(ev, 'codigo_doxa_duplicado', False)),
         'observacion_coordinador': ev.observacion_coordinador,
         'creada_por': {
@@ -127,7 +152,6 @@ class EvidenciasOperativasListCreateController(APIView):
 
         from django.db.models import Exists, OuterRef
         duplicados = EvidenciaActividadModel.objects.filter(
-            accion_id=OuterRef('accion_id'),
             codigo_doxa__iexact=OuterRef('codigo_doxa'),
         ).exclude(id=OuterRef('id'))
         qs = EvidenciaActividadModel.objects.filter(accion_id=accion_id).annotate(
@@ -182,12 +206,10 @@ class EvidenciasOperativasListCreateController(APIView):
         except ValueError as e:
             return Response({'ok': False, 'error': str(e)}, status=400)
 
-        # Bloquea la fila de la acción para serializar cargas simultáneas.
-        accion.__class__.objects.select_for_update().get(id=accion.id)
-        if _codigo_doxa_ya_existe(accion_id, codigo_doxa):
+        if not _reservar_codigo_doxa(codigo_doxa):
             return Response({
                 'ok': False,
-                'error': f'El Código Doxa {codigo_doxa} ya fue cargado en esta clase/acción.',
+                'error': f'El Código Doxa {codigo_doxa} ya existe en el sistema. No se puede continuar.',
             }, status=400)
 
         ev = EvidenciaActividadModel.objects.create(
@@ -247,6 +269,7 @@ class EvidenciasOperativasDetailController(APIView):
             ev.cantidad_ejecutada = request.data.get('cantidad_ejecutada') or 0
 
         if 'codigo_doxa' in request.data or getattr(ev.accion, 'requiere_codigo_doxa', False):
+            codigo_anterior = (ev.codigo_doxa or '').strip().upper()
             try:
                 ev.codigo_doxa = _validar_codigo_doxa(
                     request.data.get('codigo_doxa', ev.codigo_doxa),
@@ -254,10 +277,10 @@ class EvidenciasOperativasDetailController(APIView):
                 )
             except ValueError as e:
                 return Response({'ok': False, 'error': str(e)}, status=400)
-            if _codigo_doxa_ya_existe(accion_id, ev.codigo_doxa, excluir_id=ev.id):
+            if ev.codigo_doxa != codigo_anterior and not _reservar_codigo_doxa(ev.codigo_doxa):
                 return Response({
                     'ok': False,
-                    'error': f'El Código Doxa {ev.codigo_doxa} ya fue cargado en esta clase/acción.',
+                    'error': f'El Código Doxa {ev.codigo_doxa} ya existe en el sistema. No se puede continuar.',
                 }, status=400)
             
         if 'grupo_id' in request.data or getattr(ev.accion, 'requiere_grupos', False):

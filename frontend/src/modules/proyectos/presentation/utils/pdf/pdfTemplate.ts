@@ -220,7 +220,7 @@ export function evidenciaPageHtml(
       <div style="text-align:center;font-weight:700;font-size:12px;color:#7c3aed;margin:4px 0;">INFORME DE EVIDENCIA</div>
       <table class="info">
         <tr><td>Evidencia</td><td>${ev.nombre}</td></tr>
-        ${ev.codigo_doxa ? `<tr><td>Código Doxa</td><td><strong>${ev.codigo_doxa}</strong></td></tr>` : ''}
+        ${ev.codigo_doxa ? `<tr><td>Código Doxa</td><td><strong>${ev.codigo_doxa_etiqueta || ev.codigo_doxa}</strong></td></tr>` : ''}
         <tr><td>Fecha Ejecución</td><td>${ev.fecha_ejecucion || '—'}</td></tr>
         <tr><td>Fecha de Carga</td><td>${ev.created_at || '—'}</td></tr>
         ${ev.cantidad_ejecutada != null ? `<tr><td>Cantidad Ejecutada</td><td>${ev.cantidad_ejecutada}</td></tr>` : ''}

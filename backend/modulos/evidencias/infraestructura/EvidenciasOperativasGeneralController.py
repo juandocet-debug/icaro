@@ -74,6 +74,18 @@ def _serialize_evidencia_general(ev):
 
     soportes = list(ev.soportes.all())
 
+    codigo_etiqueta = ev.codigo_doxa
+    if ev.codigo_doxa and getattr(ev, 'codigo_doxa_duplicado', False):
+        ids = list(EvidenciaActividadModel.objects.filter(
+            codigo_doxa__iexact=ev.codigo_doxa,
+        ).order_by('created_at', 'id').values_list('id', flat=True))
+        try:
+            posicion = ids.index(ev.id)
+            sufijo = chr(ord('A') + posicion) if posicion < 26 else str(posicion + 1)
+            codigo_etiqueta = f'{ev.codigo_doxa} {sufijo}'
+        except ValueError:
+            pass
+
     meta_nombre = ''
     componente_nombre = ''
     if ev.accion and ev.accion.component:
@@ -89,6 +101,7 @@ def _serialize_evidencia_general(ev):
         'cantidad_ejecutada': float(ev.cantidad_ejecutada),
         'estado': ev.estado,
         'codigo_doxa': ev.codigo_doxa,
+        'codigo_doxa_etiqueta': codigo_etiqueta,
         'codigo_doxa_duplicado': bool(getattr(ev, 'codigo_doxa_duplicado', False)),
         'observacion_coordinador': ev.observacion_coordinador,
         'creada_por': {
@@ -175,7 +188,6 @@ class EvidenciasOperativasGeneralController(APIView):
         from modulos.acciones.infraestructura.models import RequisitoVerificacionAccionModel
 
         duplicados = EvidenciaActividadModel.objects.filter(
-            accion_id=OuterRef('accion_id'),
             codigo_doxa__iexact=OuterRef('codigo_doxa'),
         ).exclude(id=OuterRef('id'))
         qs = EvidenciaActividadModel.objects.filter(

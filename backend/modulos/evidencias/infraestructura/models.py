@@ -53,3 +53,13 @@ class EvidenciaActividadModel(models.Model):
             models.Index(fields=['creada_por', 'created_at'], name='evact_user_created_idx'),
             models.Index(fields=['grupo', 'created_at'], name='evact_grupo_created_idx'),
         ]
+
+
+class CodigoDoxaRegistradoModel(models.Model):
+    """Reserva permanente que garantiza un Código Doxa único en todo el sistema."""
+    codigo = models.CharField(max_length=16, primary_key=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        app_label = 'evidencias'
+        db_table = 'codigos_doxa_registrados'
