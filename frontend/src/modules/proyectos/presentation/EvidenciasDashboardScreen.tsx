@@ -35,6 +35,7 @@ interface EvidenciaGeneral {
   cantidad_ejecutada: number;
   estado: string;
   codigo_doxa?: string | null;
+  codigo_doxa_duplicado?: boolean;
   observacion_coordinador: string | null;
   creada_por: {
     id: string;
@@ -794,7 +795,7 @@ export const EvidenciasDashboardScreen: React.FC<Props> = ({ proyectoId }) => {
                 <Text style={[styles.th, { flex: 1.8 }]}>Acción / Actividad</Text>
                 <Text style={[styles.th, { flex: 2.2 }]}>Evidencia (Carpeta)</Text>
                 <Text style={[styles.th, { width: 90, textAlign: 'center' }]}>Cant. Soportes</Text>
-                <Text style={[styles.th, { flex: 1.2 }]}>Fecha Ejec.</Text>
+                <Text style={[styles.th, { flex: 1.4 }]}>Fechas</Text>
                 <Text style={[styles.th, { width: 90, textAlign: 'center' }]}>Estado</Text>
                 <Text style={[styles.th, { width: 140, textAlign: 'center' }]}>Acciones</Text>
               </View>
@@ -857,8 +858,8 @@ export const EvidenciasDashboardScreen: React.FC<Props> = ({ proyectoId }) => {
                             {ev.nombre}
                           </Text>
                           {!!ev.codigo_doxa && (
-                            <View style={{ alignSelf: 'flex-start', marginTop: 3, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, backgroundColor: '#ecfdf5', borderWidth: 1, borderColor: '#bbf7d0' } as any}>
-                              <Text style={{ fontFamily: typography.fontFamily, fontSize: 10, color: '#047857', fontWeight: '800', letterSpacing: 0.4 }}>
+                            <View style={{ alignSelf: 'flex-start', marginTop: 3, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, backgroundColor: ev.codigo_doxa_duplicado ? '#fef2f2' : '#ecfdf5', borderWidth: 1, borderColor: ev.codigo_doxa_duplicado ? '#fca5a5' : '#bbf7d0' } as any}>
+                              <Text style={{ fontFamily: typography.fontFamily, fontSize: 10, color: ev.codigo_doxa_duplicado ? '#dc2626' : '#047857', fontWeight: '800', letterSpacing: 0.4 }}>
                                 {ev.codigo_doxa}
                               </Text>
                             </View>
@@ -884,9 +885,10 @@ export const EvidenciasDashboardScreen: React.FC<Props> = ({ proyectoId }) => {
                       </View>
 
                       {/* Fecha */}
-                      <Text style={[styles.td, { flex: 1.2, color: colors.textSecondary }]}>
-                        {ev.fecha_ejecucion || '-'}
-                      </Text>
+                      <View style={{ flex: 1.4 }}>
+                        <Text style={[styles.td, { color: colors.textSecondary }]}>Real: {ev.fecha_ejecucion || '-'}</Text>
+                        <Text style={[styles.td, { color: colors.textSecondary, fontSize: 10 }]}>Carga: {ev.created_at || '-'}</Text>
+                      </View>
 
                       {/* Estado */}
                       <View style={{ width: 90, alignItems: 'center' }}>
@@ -961,8 +963,8 @@ export const EvidenciasDashboardScreen: React.FC<Props> = ({ proyectoId }) => {
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 } as any}>
                             <Text style={styles.drawerTitle}>Lista de Requisitos de Verificación</Text>
                               {!!ev.codigo_doxa && (
-                                <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, backgroundColor: '#ecfdf5', borderWidth: 1, borderColor: '#bbf7d0' } as any}>
-                                  <Text style={{ fontFamily: typography.fontFamily, fontSize: 10, color: '#047857', fontWeight: '800', letterSpacing: 0.4 }}>
+                                <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, backgroundColor: ev.codigo_doxa_duplicado ? '#fef2f2' : '#ecfdf5', borderWidth: 1, borderColor: ev.codigo_doxa_duplicado ? '#fca5a5' : '#bbf7d0' } as any}>
+                                  <Text style={{ fontFamily: typography.fontFamily, fontSize: 10, color: ev.codigo_doxa_duplicado ? '#dc2626' : '#047857', fontWeight: '800', letterSpacing: 0.4 }}>
                                     {ev.codigo_doxa}
                                   </Text>
                                 </View>

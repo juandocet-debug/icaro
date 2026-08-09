@@ -1,6 +1,6 @@
 /**
  * generatePDF.ts — orquestador principal del PDF institucional v3.
- * - Fotos regulares: 4/hoja (grilla 2×2)
+ * - Fotos regulares: maximo 2/hoja, completas y sin deformacion
  * - Listas de asistencia: 1/hoja, agrupadas después de las fotos de cada evidencia
  * - Header/footer absolutamente fijos (height:297mm por página)
  */

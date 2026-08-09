@@ -216,8 +216,23 @@ export const useMisActividades = (selectedAccionId?: string) => {
   }, [requisitosEvidenciaActiva]);
 
   // ── Crear Nueva Evidencia Operativa ────────────────────────────────────
-  const openEvModal = (act?: any) => {
-    const actData = act || selectedAct;
+  const openEvModal = async () => {
+    if (!selectedAct?.accion?.id) return;
+
+    // La configuracion puede cambiar mientras el profesional tiene la vista
+    // abierta (grupos, tipos de evidencia o Codigo Doxa). Consultarla otra vez
+    // evita abrir el formulario con una copia desactualizada.
+    let actData = selectedAct;
+    try {
+      const res = await api.get(`/api/mis-actividades/${selectedAct.accion.id}/`);
+      if (res.data?.datos) {
+        actData = res.data.datos;
+        setSelectedAct(actData);
+      }
+    } catch {
+      // Si falla la actualizacion puntual, se conserva el detalle ya cargado.
+    }
+
     const tipos: string[] = actData?.accion?.tipos_evidencia_permitidos ?? [];
     const unidad: string = actData?.accion?.unidad_medida || '';
     // Si no hay tipos configurados, auto-poblar nombre y cantidad

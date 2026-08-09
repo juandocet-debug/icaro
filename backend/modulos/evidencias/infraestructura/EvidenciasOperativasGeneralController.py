@@ -89,6 +89,7 @@ def _serialize_evidencia_general(ev):
         'cantidad_ejecutada': float(ev.cantidad_ejecutada),
         'estado': ev.estado,
         'codigo_doxa': ev.codigo_doxa,
+        'codigo_doxa_duplicado': bool(getattr(ev, 'codigo_doxa_duplicado', False)),
         'observacion_coordinador': ev.observacion_coordinador,
         'creada_por': {
             'id': str(ev.creada_por_id),
@@ -170,11 +171,17 @@ class EvidenciasOperativasGeneralController(APIView):
             return Response({'ok': False, 'error': 'No tienes permisos de gestor en este proyecto.'}, status=403)
 
 
-        from django.db.models import Count, Prefetch
+        from django.db.models import Count, Exists, OuterRef, Prefetch
         from modulos.acciones.infraestructura.models import RequisitoVerificacionAccionModel
 
+        duplicados = EvidenciaActividadModel.objects.filter(
+            accion_id=OuterRef('accion_id'),
+            codigo_doxa__iexact=OuterRef('codigo_doxa'),
+        ).exclude(id=OuterRef('id'))
         qs = EvidenciaActividadModel.objects.filter(
             accion__component__project_id=proyecto_id
+        ).annotate(
+            codigo_doxa_duplicado=Exists(duplicados),
         ).select_related(
             'creada_por', 'creada_por__profile',
             'accion', 'accion__component', 'accion__component__meta', 'grupo',

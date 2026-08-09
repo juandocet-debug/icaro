@@ -79,18 +79,40 @@ export function getSharedCss(): string {
     .photos-stack {
       display: flex;
       flex-direction: column;
-      gap: 12px;
-      flex: 1;
-    }
-    .photo-cell {
-      display: flex;
-      flex-direction: column;
+      gap: 4mm;
       flex: 1;
       min-height: 0;
       overflow: hidden;
     }
+    .photo-cell {
+      display: flex;
+      flex-direction: column;
+      flex: 1 1 0;
+      height: 0;
+      min-height: 0;
+      overflow: hidden;
+    }
     .photo-cell .photo-lbl { font-size:8px; color:#475569; font-style:italic; margin-bottom:3px; flex-shrink:0; }
-    .photo-cell img { flex:1; width:100%; height:100%; object-fit:contain; min-height:0; }
+    /* El marco evita que el tamano intrinseco de la foto desborde su mitad de pagina. */
+    .photo-frame {
+      position: relative;
+      flex: 1 1 0;
+      min-height: 0;
+      width: 100%;
+      overflow: hidden;
+      background: #fff;
+    }
+    .photo-frame img {
+      position: absolute;
+      inset: 0;
+      display: block;
+      width: 100%;
+      height: 100%;
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+      object-position: center center;
+    }
 
     /* Plan de sesión: una hoja propia, grande, centrado y legible */
     .plan-img {
@@ -198,7 +220,9 @@ export function evidenciaPageHtml(
       <div style="text-align:center;font-weight:700;font-size:12px;color:#7c3aed;margin:4px 0;">INFORME DE EVIDENCIA</div>
       <table class="info">
         <tr><td>Evidencia</td><td>${ev.nombre}</td></tr>
+        ${ev.codigo_doxa ? `<tr><td>Código Doxa</td><td><strong>${ev.codigo_doxa}</strong></td></tr>` : ''}
         <tr><td>Fecha Ejecución</td><td>${ev.fecha_ejecucion || '—'}</td></tr>
+        <tr><td>Fecha de Carga</td><td>${ev.created_at || '—'}</td></tr>
         ${ev.cantidad_ejecutada != null ? `<tr><td>Cantidad Ejecutada</td><td>${ev.cantidad_ejecutada}</td></tr>` : ''}
       </table>
       ${ev.observacion_coordinador ? `<div class="sec">OBSERVACIONES</div>
@@ -228,7 +252,7 @@ export function fotosPageHtml(
         ${group.map((f, i) => !f.b64 ? '' : `
           <div class="photo-cell">
             <div class="photo-lbl">Fotografía ${pi * 2 + i + 1}. ${f.label}</div>
-            <img src="${f.b64}" />
+            <div class="photo-frame"><img src="${f.b64}" /></div>
           </div>`).join('')}
       </div>
     </div>

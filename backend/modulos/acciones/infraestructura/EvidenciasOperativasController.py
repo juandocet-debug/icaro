@@ -28,6 +28,18 @@ def _validar_codigo_doxa(value, requerido=False):
     return codigo
 
 
+def _codigo_doxa_ya_existe(accion_id, codigo, excluir_id=None):
+    if not codigo:
+        return False
+    qs = EvidenciaActividadModel.objects.filter(
+        accion_id=accion_id,
+        codigo_doxa__iexact=codigo,
+    )
+    if excluir_id:
+        qs = qs.exclude(id=excluir_id)
+    return qs.exists()
+
+
 def _s_soporte(u):
     return {
         'id': str(u.id),
@@ -60,6 +72,7 @@ def _s_evidencia(ev):
         'cantidad_ejecutada': float(ev.cantidad_ejecutada),
         'estado': ev.estado,
         'codigo_doxa': ev.codigo_doxa,
+        'codigo_doxa_duplicado': bool(getattr(ev, 'codigo_doxa_duplicado', False)),
         'observacion_coordinador': ev.observacion_coordinador,
         'creada_por': {
             'id': str(ev.creada_por_id),
@@ -112,7 +125,14 @@ class EvidenciasOperativasListCreateController(APIView):
         except PermissionError as e:
             return Response({'ok': False, 'error': str(e)}, status=403)
 
-        qs = EvidenciaActividadModel.objects.filter(accion_id=accion_id).select_related(
+        from django.db.models import Exists, OuterRef
+        duplicados = EvidenciaActividadModel.objects.filter(
+            accion_id=OuterRef('accion_id'),
+            codigo_doxa__iexact=OuterRef('codigo_doxa'),
+        ).exclude(id=OuterRef('id'))
+        qs = EvidenciaActividadModel.objects.filter(accion_id=accion_id).annotate(
+            codigo_doxa_duplicado=Exists(duplicados),
+        ).select_related(
             'creada_por', 'creada_por__profile', 'grupo'
         ).prefetch_related('soportes')
         if not es_gestor:
@@ -120,6 +140,7 @@ class EvidenciasOperativasListCreateController(APIView):
 
         return Response({'ok': True, 'datos': [_s_evidencia(ev) for ev in qs]}, status=200)
 
+    @transaction.atomic
     def post(self, request, accion_id):
         try:
             accion, _, _ = _verificar_acceso_actividad(request.user, accion_id)
@@ -161,6 +182,14 @@ class EvidenciasOperativasListCreateController(APIView):
         except ValueError as e:
             return Response({'ok': False, 'error': str(e)}, status=400)
 
+        # Bloquea la fila de la acción para serializar cargas simultáneas.
+        accion.__class__.objects.select_for_update().get(id=accion.id)
+        if _codigo_doxa_ya_existe(accion_id, codigo_doxa):
+            return Response({
+                'ok': False,
+                'error': f'El Código Doxa {codigo_doxa} ya fue cargado en esta clase/acción.',
+            }, status=400)
+
         ev = EvidenciaActividadModel.objects.create(
             accion=accion,
             creada_por=request.user,
@@ -183,6 +212,7 @@ class EvidenciasOperativasListCreateController(APIView):
 class EvidenciasOperativasDetailController(APIView):
     permission_classes = [IsAuthenticated]
 
+    @transaction.atomic
     def put(self, request, accion_id, ev_id):
         try:
             _, _, es_gestor = _verificar_acceso_actividad(request.user, accion_id)
@@ -200,6 +230,9 @@ class EvidenciasOperativasDetailController(APIView):
 
         if ev.estado not in ('borrador', 'reabierta'):
             return Response({'ok': False, 'error': 'Solo se puede editar una evidencia en borrador o reabierta.'}, status=400)
+
+        # Serializa cambios de código concurrentes dentro de la misma acción.
+        ev.accion.__class__.objects.select_for_update().get(id=ev.accion_id)
 
         if 'nombre' in request.data:
             nombre = (request.data.get('nombre') or '').strip()
@@ -221,6 +254,11 @@ class EvidenciasOperativasDetailController(APIView):
                 )
             except ValueError as e:
                 return Response({'ok': False, 'error': str(e)}, status=400)
+            if _codigo_doxa_ya_existe(accion_id, ev.codigo_doxa, excluir_id=ev.id):
+                return Response({
+                    'ok': False,
+                    'error': f'El Código Doxa {ev.codigo_doxa} ya fue cargado en esta clase/acción.',
+                }, status=400)
             
         if 'grupo_id' in request.data or getattr(ev.accion, 'requiere_grupos', False):
             grupo_id = request.data.get('grupo_id')
