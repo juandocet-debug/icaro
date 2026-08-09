@@ -82,7 +82,7 @@ def _serialize_evidencia_general(ev):
         try:
             posicion = ids.index(ev.id)
             sufijo = chr(ord('A') + posicion) if posicion < 26 else str(posicion + 1)
-            codigo_etiqueta = f'{ev.codigo_doxa} {sufijo}'
+            codigo_etiqueta = f'{ev.codigo_doxa}-{sufijo}*'
         except ValueError:
             pass
 

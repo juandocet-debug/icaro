@@ -61,7 +61,7 @@ def _etiqueta_codigo_doxa(ev):
     except ValueError:
         return ev.codigo_doxa
     sufijo = chr(ord('A') + posicion) if posicion < 26 else str(posicion + 1)
-    return f'{ev.codigo_doxa} {sufijo}'
+    return f'{ev.codigo_doxa}-{sufijo}*'
 
 
 def _s_soporte(u):

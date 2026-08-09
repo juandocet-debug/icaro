@@ -878,8 +878,8 @@ export const EvidenciasDashboardScreen: React.FC<Props> = ({ proyectoId }) => {
                             {ev.nombre}
                           </Text>
                           {!!ev.codigo_doxa && (
-                            <View style={{ alignSelf: 'flex-start', marginTop: 3, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, backgroundColor: ev.codigo_doxa_duplicado ? '#fef2f2' : '#ecfdf5', borderWidth: 1, borderColor: ev.codigo_doxa_duplicado ? '#fca5a5' : '#bbf7d0' } as any}>
-                              <Text style={{ fontFamily: typography.fontFamily, fontSize: 10, color: ev.codigo_doxa_duplicado ? '#dc2626' : '#047857', fontWeight: '800', letterSpacing: 0.4 }}>
+                            <View style={{ alignSelf: 'flex-start', marginTop: 3, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, backgroundColor: '#ecfdf5', borderWidth: 1, borderColor: '#bbf7d0' } as any}>
+                              <Text style={{ fontFamily: typography.fontFamily, fontSize: 10, color: '#047857', fontWeight: '800', letterSpacing: 0.4 }}>
                                 {ev.codigo_doxa_etiqueta || ev.codigo_doxa}
                               </Text>
                             </View>
@@ -983,8 +983,8 @@ export const EvidenciasDashboardScreen: React.FC<Props> = ({ proyectoId }) => {
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 } as any}>
                             <Text style={styles.drawerTitle}>Lista de Requisitos de Verificación</Text>
                               {!!ev.codigo_doxa && (
-                                <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, backgroundColor: ev.codigo_doxa_duplicado ? '#fef2f2' : '#ecfdf5', borderWidth: 1, borderColor: ev.codigo_doxa_duplicado ? '#fca5a5' : '#bbf7d0' } as any}>
-                                  <Text style={{ fontFamily: typography.fontFamily, fontSize: 10, color: ev.codigo_doxa_duplicado ? '#dc2626' : '#047857', fontWeight: '800', letterSpacing: 0.4 }}>
+                                <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, backgroundColor: '#ecfdf5', borderWidth: 1, borderColor: '#bbf7d0' } as any}>
+                                  <Text style={{ fontFamily: typography.fontFamily, fontSize: 10, color: '#047857', fontWeight: '800', letterSpacing: 0.4 }}>
                                     {ev.codigo_doxa_etiqueta || ev.codigo_doxa}
                                   </Text>
                                 </View>

@@ -241,7 +241,7 @@ def test_filtering_and_components_search(api_client, superuser, project, compone
     assert len(res.data['datos']) == 1
     assert res.data['datos'][0]['id'] == str(ev1.id)
     assert res.data['datos'][0]['codigo_doxa'] == 'TOG01C03'
-    assert res.data['datos'][0]['codigo_doxa_etiqueta'] == 'TOG01C03 A'
+    assert res.data['datos'][0]['codigo_doxa_etiqueta'] == 'TOG01C03-A*'
 
     res_todas = api_client.get(url_general)
     etiquetas = {
@@ -249,7 +249,7 @@ def test_filtering_and_components_search(api_client, superuser, project, compone
         for item in res_todas.data['datos']
         if item['codigo_doxa'] == 'TOG01C03'
     }
-    assert etiquetas == {'TOG01C03 A', 'TOG01C03 B'}
+    assert etiquetas == {'TOG01C03-A*', 'TOG01C03-B*'}
 
     # 2. Filter actions by requiere_grupos
     url_actions = f'/api/acciones/{component.id}/acciones/'
