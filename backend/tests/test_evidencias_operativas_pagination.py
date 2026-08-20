@@ -37,6 +37,7 @@ def test_evidencias_operativas_general_is_paginated():
     assert response.data['page'] == 2
     assert response.data['page_size'] == 20
     assert len(response.data['datos']) == 20
+    assert response.data['datos'][0]['created_at_iso'] is not None
     assert response.data['next'] is not None
     assert response.data['previous'] is not None
 

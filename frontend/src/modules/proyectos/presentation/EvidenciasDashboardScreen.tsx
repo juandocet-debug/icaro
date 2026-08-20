@@ -63,6 +63,7 @@ interface EvidenciaGeneral {
   } | null;
   soportes: Soporte[];
   created_at: string | null;
+  created_at_iso?: string | null;
 }
 
 interface Props {
@@ -72,6 +73,27 @@ interface Props {
 import { env } from '../../../config/env';
 
 const DASHBOARD_FETCH_LIMIT = 100;
+
+const LOAD_DATE_MONTHS: Record<string, string> = {
+  jan: '01', ene: '01', feb: '02', mar: '03', apr: '04', abr: '04',
+  may: '05', jun: '06', jul: '07', aug: '08', ago: '08', sep: '09',
+  oct: '10', nov: '11', dec: '12', dic: '12',
+};
+
+const getLoadDate = (ev: EvidenciaGeneral): string | null => {
+  if (ev.created_at_iso) return ev.created_at_iso.slice(0, 10);
+  const match = ev.created_at?.trim().match(/^(\d{1,2})\s+([A-Za-zÁÉÍÓÚáéíóú]{3})\s+(\d{4})$/);
+  if (!match) return null;
+  const month = LOAD_DATE_MONTHS[match[2].toLowerCase()];
+  return month ? `${match[3]}-${month}-${match[1].padStart(2, '0')}` : null;
+};
+
+const isOutsideLoadDateRange = (ev: EvidenciaGeneral, desde: string, hasta: string): boolean => {
+  if (!desde && !hasta) return false;
+  const loadDate = getLoadDate(ev);
+  if (!loadDate) return true;
+  return Boolean((desde && loadDate < desde) || (hasta && loadDate > hasta));
+};
 
 const toUrl = (url: string) => {
   const API_BASE = env.apiUrl;
@@ -261,8 +283,7 @@ export const EvidenciasDashboardScreen: React.FC<Props> = ({ proyectoId }) => {
       if (selectedEstado !== 'todos' && ev.estado !== selectedEstado) return;
       if (selectedMeta !== 'todos' && ev.accion?.meta_nombre !== selectedMeta) return;
       if (selectedAccion !== 'todos' && ev.accion?.id !== selectedAccion) return;
-      if (fechaDesde && ev.fecha_ejecucion && ev.fecha_ejecucion < fechaDesde) return;
-      if (fechaHasta && ev.fecha_ejecucion && ev.fecha_ejecucion > fechaHasta) return;
+      if (isOutsideLoadDateRange(ev, fechaDesde, fechaHasta)) return;
       if (ev.creada_por?.nombre) {
         nombres.add(ev.creada_por.nombre);
       }
@@ -296,8 +317,7 @@ export const EvidenciasDashboardScreen: React.FC<Props> = ({ proyectoId }) => {
       if (selectedColaborador !== 'todos' && ev.creada_por?.nombre !== selectedColaborador) return;
       if (selectedComponente !== 'todos' && ev.accion?.componente_nombre !== selectedComponente) return;
       if (selectedAccion !== 'todos' && ev.accion?.id !== selectedAccion) return;
-      if (fechaDesde && ev.fecha_ejecucion && ev.fecha_ejecucion < fechaDesde) return;
-      if (fechaHasta && ev.fecha_ejecucion && ev.fecha_ejecucion > fechaHasta) return;
+      if (isOutsideLoadDateRange(ev, fechaDesde, fechaHasta)) return;
       if (ev.accion?.meta_nombre) {
         names.add(ev.accion.meta_nombre);
       }
@@ -313,8 +333,7 @@ export const EvidenciasDashboardScreen: React.FC<Props> = ({ proyectoId }) => {
       if (selectedColaborador !== 'todos' && ev.creada_por?.nombre !== selectedColaborador) return;
       if (selectedMeta !== 'todos' && ev.accion?.meta_nombre !== selectedMeta) return;
       if (selectedAccion !== 'todos' && ev.accion?.id !== selectedAccion) return;
-      if (fechaDesde && ev.fecha_ejecucion && ev.fecha_ejecucion < fechaDesde) return;
-      if (fechaHasta && ev.fecha_ejecucion && ev.fecha_ejecucion > fechaHasta) return;
+      if (isOutsideLoadDateRange(ev, fechaDesde, fechaHasta)) return;
       if (ev.accion?.componente_nombre) {
         names.add(ev.accion.componente_nombre);
       }
@@ -330,8 +349,7 @@ export const EvidenciasDashboardScreen: React.FC<Props> = ({ proyectoId }) => {
       if (selectedColaborador !== 'todos' && ev.creada_por?.nombre !== selectedColaborador) return;
       if (selectedMeta !== 'todos' && ev.accion?.meta_nombre !== selectedMeta) return;
       if (selectedComponente !== 'todos' && ev.accion?.componente_nombre !== selectedComponente) return;
-      if (fechaDesde && ev.fecha_ejecucion && ev.fecha_ejecucion < fechaDesde) return;
-      if (fechaHasta && ev.fecha_ejecucion && ev.fecha_ejecucion > fechaHasta) return;
+      if (isOutsideLoadDateRange(ev, fechaDesde, fechaHasta)) return;
       if (ev.accion?.id && ev.accion?.nombre) {
         opciones.set(ev.accion.id, ev.accion.nombre);
       }
@@ -347,8 +365,7 @@ export const EvidenciasDashboardScreen: React.FC<Props> = ({ proyectoId }) => {
       if (selectedColaborador !== 'todos' && ev.creada_por?.nombre !== selectedColaborador) return;
       if (selectedMeta !== 'todos' && ev.accion?.meta_nombre !== selectedMeta) return;
       if (selectedAccion !== 'todos' && ev.accion?.id !== selectedAccion) return;
-      if (fechaDesde && ev.fecha_ejecucion && ev.fecha_ejecucion < fechaDesde) return;
-      if (fechaHasta && ev.fecha_ejecucion && ev.fecha_ejecucion > fechaHasta) return;
+      if (isOutsideLoadDateRange(ev, fechaDesde, fechaHasta)) return;
       if (ev.estado) {
         states.add(ev.estado);
       }
@@ -391,8 +408,7 @@ export const EvidenciasDashboardScreen: React.FC<Props> = ({ proyectoId }) => {
       if (selectedComponente !== 'todos' && ev.accion?.componente_nombre !== selectedComponente) return false;
       if (selectedAccion !== 'todos' && ev.accion?.id !== selectedAccion) return false;
       if (selectedGrupoId && (!ev.grupo || ev.grupo.id !== selectedGrupoId)) return false;
-      if (fechaDesde && ev.fecha_ejecucion && ev.fecha_ejecucion < fechaDesde) return false;
-      if (fechaHasta && ev.fecha_ejecucion && ev.fecha_ejecucion > fechaHasta) return false;
+      if (isOutsideLoadDateRange(ev, fechaDesde, fechaHasta)) return false;
       return true;
     });
   }, [evidencias, searchQuery, selectedEstado, selectedColaborador, selectedMeta, selectedComponente, selectedAccion, selectedGrupoId, fechaDesde, fechaHasta]);
@@ -768,7 +784,7 @@ export const EvidenciasDashboardScreen: React.FC<Props> = ({ proyectoId }) => {
 
           {/* Fechas */}
           <View style={[styles.filterGroup, { flex: 1, minWidth: 130 } as any]}>
-            <Text style={styles.filterLabel}>Fecha desde</Text>
+            <Text style={styles.filterLabel}>Fecha de carga desde</Text>
             <View style={styles.inputWrapper}>
               {Platform.OS === 'web' ? (
                 <input
@@ -782,7 +798,7 @@ export const EvidenciasDashboardScreen: React.FC<Props> = ({ proyectoId }) => {
           </View>
 
           <View style={[styles.filterGroup, { flex: 1, minWidth: 130 } as any]}>
-            <Text style={styles.filterLabel}>Fecha hasta</Text>
+            <Text style={styles.filterLabel}>Fecha de carga hasta</Text>
             <View style={styles.inputWrapper}>
               {Platform.OS === 'web' ? (
                 <input

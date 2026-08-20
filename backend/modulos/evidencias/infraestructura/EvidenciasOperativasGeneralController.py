@@ -132,6 +132,7 @@ def _serialize_evidencia_general(ev):
         } if ev.grupo else None,
         'soportes': [_serialize_soporte(u) for u in soportes],
         'created_at': ev.created_at.strftime('%d %b %Y') if ev.created_at else None,
+        'created_at_iso': ev.created_at.date().isoformat() if ev.created_at else None,
     }
 
 
