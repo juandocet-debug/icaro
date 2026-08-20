@@ -167,6 +167,27 @@ def test_evidencias_requiere_grupos_validation(api_client, superuser, action_req
     assert res.data['datos']['grupo']['id'] == str(grupo1.id)
     assert res.data['datos']['codigo_doxa'] == 'TOG01C03'
 
+    # Doxa puede variar la numeración y el orden de los segmentos.
+    res_variable = api_client.post(url_ev_req, data={
+        'nombre': 'Visita TÃ©cnica',
+        'grupo_id': str(grupo1.id),
+        'cantidad_ejecutada': 1.0,
+        'codigo_doxa': 'c3esg001',
+    }, format='json')
+    assert res_variable.status_code == 201
+    assert res_variable.data['datos']['codigo_doxa'] == 'C3ESG001'
+
+    # Texto libre, números solos y símbolos no se aceptan como Código Doxa.
+    for codigo_invalido in ('CODIGOLIBRE', '12345678', 'ESG-001'):
+        res_invalido = api_client.post(url_ev_req, data={
+            'nombre': 'Visita TÃ©cnica',
+            'grupo_id': str(grupo1.id),
+            'cantidad_ejecutada': 1.0,
+            'codigo_doxa': codigo_invalido,
+        }, format='json')
+        assert res_invalido.status_code == 400
+        assert 'Doxa' in res_invalido.data['error']
+
     # El código queda reservado globalmente, incluso para otra acción.
     res_dup_global = api_client.post(
         f'/api/mis-actividades/{action_no_groups.id}/evidencias-operativas/',

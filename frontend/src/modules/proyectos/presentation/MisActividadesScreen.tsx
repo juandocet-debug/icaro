@@ -109,7 +109,7 @@ export const MisActividadesScreen: React.FC<Props> = ({ selectedAccionId }) => {
                 autoCapitalize="characters"
               />
               <Text style={{ fontFamily: typography.fontFamily, fontSize: 11, color: state.evCodigoDoxaValido ? colors.textSecondary : colors.error, marginTop: -4 }}>
-                Formato esperado: prefijo + G01 + C03, sin espacios.
+                Usa el código generado por Doxa: entre 5 y 16 caracteres, con letras y números, sin espacios.
               </Text>
             </View>
           )}

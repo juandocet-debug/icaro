@@ -14,7 +14,10 @@ from modulos.acciones.infraestructura.models import RequisitoVerificacionAccionM
 from modulos.acciones.infraestructura.MisActividadesController import _verificar_acceso_actividad, _audit
 
 MAX_SOPORTE_MB = 50
-CODIGO_DOXA_RE = re.compile(r'^[A-Z0-9]{2,6}G\d{2}C\d{2}$')
+# Doxa define la numeracion y puede cambiar el orden de sus segmentos. Validamos
+# solamente las propiedades estables del identificador para rechazar texto libre:
+# longitud acotada, solo caracteres alfanumericos y mezcla de letras y numeros.
+CODIGO_DOXA_RE = re.compile(r'^(?=.*[A-Z])(?=.*\d)[A-Z0-9]{5,16}$')
 
 
 def _validar_codigo_doxa(value, requerido=False):
@@ -24,7 +27,7 @@ def _validar_codigo_doxa(value, requerido=False):
             raise ValueError('El Código Doxa es obligatorio para esta acción.')
         return None
     if len(codigo) > 16 or not CODIGO_DOXA_RE.fullmatch(codigo):
-        raise ValueError('Código Doxa inválido. Usa formato como TOG01C03, en mayúsculas, sin espacios.')
+        raise ValueError('Código Doxa inválido. Debe tener de 5 a 16 caracteres, incluir letras y números, y no contener espacios ni símbolos.')
     return codigo
 
 

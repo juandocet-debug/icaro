@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { asignacionResponsableRepo } from '../../../../shared/dependencies';
 import { api } from '../../../../services/api';
 
-const CODIGO_DOXA_RE = /^[A-Z0-9]{2,6}G\d{2}C\d{2}$/;
+const CODIGO_DOXA_RE = /^(?=.*[A-Z])(?=.*\d)[A-Z0-9]{5,16}$/;
 
 export const normalizarCodigoDoxa = (value: string) => value.replace(/\s+/g, '').toUpperCase();
 
@@ -251,7 +251,7 @@ export const useMisActividades = (selectedAccionId?: string) => {
     const requiereCodigoDoxa = !!selectedAct.accion?.requiere_codigo_doxa;
     const codigoDoxa = normalizarCodigoDoxa(evCodigoDoxa);
     if (requiereCodigoDoxa && !CODIGO_DOXA_RE.test(codigoDoxa)) {
-      setEvModalErr('Código Doxa inválido. Usa formato TOG01C03, en mayúsculas y sin espacios.');
+      setEvModalErr('Código Doxa inválido. Debe tener de 5 a 16 caracteres, incluir letras y números, y no contener espacios ni símbolos.');
       return;
     }
     setEvModalSaving(true);

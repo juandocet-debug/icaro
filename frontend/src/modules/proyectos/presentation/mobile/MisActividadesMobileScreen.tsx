@@ -1053,7 +1053,7 @@ export const MisActividadesMobileScreen: React.FC<MisActividadesMobileScreenProp
                   autoCapitalize="characters"
                 />
                 <Text style={{ fontSize: 11, color: state.evCodigoDoxaValido ? '#64748b' : colors.error, fontFamily: typography.fontFamily }}>
-                  Formato esperado: prefijo + G01 + C03, sin espacios.
+                  Usa el código generado por Doxa: entre 5 y 16 caracteres, con letras y números, sin espacios.
                 </Text>
               </View>
             )}
