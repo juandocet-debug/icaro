@@ -61,14 +61,21 @@ export async function generateEvidenciasPDF(params: PDFParams): Promise<string |
   const imgRefs: ImgRef[] = [];
 
   evs.forEach((ev, evIdx) => {
+    let imagePosition = 0;
     (ev.soportes || []).forEach((s: any, sIdx: number) => {
       if (s.file_type?.startsWith('image/')) {
+        const esPrimeraImagen = imagePosition === 0;
+        imagePosition += 1;
         imgRefs.push({
           evIdx, sIdx,
           url:    toAbsUrl(s.file_url),
           label:  s.requisito_nombre || s.file_name || `Foto ${sIdx + 1}`,
           isAsis: isAsistencia(s),
-          isPlan: isPlanSesion(s, ev.accion?.componente_nombre || componenteNombre),
+          isPlan: isPlanSesion(
+            s,
+            ev.accion?.componente_nombre || componenteNombre,
+            esPrimeraImagen,
+          ),
         });
       }
     });

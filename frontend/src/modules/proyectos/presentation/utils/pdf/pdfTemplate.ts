@@ -13,7 +13,7 @@ const normalizeLabel = (value: string): string =>
 export const isAsistencia = (s: any): boolean =>
   normalizeLabel(s.requisito_nombre || s.file_name || '').includes('asistencia');
 
-export const isPlanSesion = (s: any, componenteNombre = ''): boolean => {
+export const isPlanSesion = (s: any, componenteNombre = '', esPrimeraImagen = false): boolean => {
   // Revisar ambos campos: un requisito genérico no debe ocultar un nombre de
   // archivo que sí identifica claramente el plan.
   const labels = [s.requisito_nombre, s.file_name]
@@ -26,15 +26,14 @@ export const isPlanSesion = (s: any, componenteNombre = ''): boolean => {
   );
   if (esPlanExplicito) return true;
 
-  // En el componente 3 el requisito existente está rotulado "Plana". Esta
-  // compatibilidad es deliberadamente acotada para no reclasificar fotos de
-  // otros componentes.
+  // Regla funcional del componente 3: su primera imagen siempre corresponde
+  // al plan de sesión, aunque el requisito esté mal rotulado o tenga un typo.
   const componente = normalizeLabel(componenteNombre);
-  const esComponente3 = /\bcomponente\s*0?3\b/.test(componente);
-  const tieneEtiquetaPlana = labels.some((label) =>
-    label.trim().replace(/\.[a-z0-9]+$/i, '') === 'plana',
+  const esComponente3 = /\bcomponente(?:\s*(?:no|numero)\.?)?\s*0?3\b/.test(componente);
+  const parecePlanConTypo = labels.some((label) =>
+    /^plan(?:a|n)?$/i.test(label.trim().replace(/\.[a-z0-9]+$/i, '')),
   );
-  return esComponente3 && tieneEtiquetaPlana;
+  return esPrimeraImagen && (esComponente3 || parecePlanConTypo);
 };
 
 // ─── CSS compartido ────────────────────────────────────────────────────────
