@@ -13,9 +13,28 @@ const normalizeLabel = (value: string): string =>
 export const isAsistencia = (s: any): boolean =>
   normalizeLabel(s.requisito_nombre || s.file_name || '').includes('asistencia');
 
-export const isPlanSesion = (s: any): boolean => {
-  const label = normalizeLabel(s.requisito_nombre || s.file_name || '');
-  return label.includes('plan de sesion') || label.includes('plan sesion') || label.includes('planeacion');
+export const isPlanSesion = (s: any, componenteNombre = ''): boolean => {
+  // Revisar ambos campos: un requisito genérico no debe ocultar un nombre de
+  // archivo que sí identifica claramente el plan.
+  const labels = [s.requisito_nombre, s.file_name]
+    .filter(Boolean)
+    .map((value) => normalizeLabel(String(value)));
+  const esPlanExplicito = labels.some((label) =>
+    label.includes('plan de sesion')
+    || label.includes('plan sesion')
+    || label.includes('planeacion'),
+  );
+  if (esPlanExplicito) return true;
+
+  // En el componente 3 el requisito existente está rotulado "Plana". Esta
+  // compatibilidad es deliberadamente acotada para no reclasificar fotos de
+  // otros componentes.
+  const componente = normalizeLabel(componenteNombre);
+  const esComponente3 = /\bcomponente\s*0?3\b/.test(componente);
+  const tieneEtiquetaPlana = labels.some((label) =>
+    label.trim().replace(/\.[a-z0-9]+$/i, '') === 'plana',
+  );
+  return esComponente3 && tieneEtiquetaPlana;
 };
 
 // ─── CSS compartido ────────────────────────────────────────────────────────

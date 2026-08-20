@@ -68,7 +68,7 @@ export async function generateEvidenciasPDF(params: PDFParams): Promise<string |
           url:    toAbsUrl(s.file_url),
           label:  s.requisito_nombre || s.file_name || `Foto ${sIdx + 1}`,
           isAsis: isAsistencia(s),
-          isPlan: isPlanSesion(s),
+          isPlan: isPlanSesion(s, ev.accion?.componente_nombre || componenteNombre),
         });
       }
     });
