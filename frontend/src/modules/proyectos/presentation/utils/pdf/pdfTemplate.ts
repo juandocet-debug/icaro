@@ -221,8 +221,8 @@ export function evidenciaPageHtml(
       <table class="info">
         <tr><td>Evidencia</td><td>${ev.nombre}</td></tr>
         ${ev.codigo_doxa ? `<tr><td>Código Doxa</td><td><strong>${ev.codigo_doxa_etiqueta || ev.codigo_doxa}</strong></td></tr>` : ''}
+        ${ev.grupo ? `<tr><td>Grupo / Cohorte</td><td><strong>${ev.grupo.nombre}${ev.grupo.codigo ? ` (${ev.grupo.codigo})` : ''}</strong></td></tr>` : ''}
         <tr><td>Fecha Ejecución</td><td>${ev.fecha_ejecucion || '—'}</td></tr>
-        <tr><td>Fecha de Carga</td><td>${ev.created_at || '—'}</td></tr>
         ${ev.cantidad_ejecutada != null ? `<tr><td>Cantidad Ejecutada</td><td>${ev.cantidad_ejecutada}</td></tr>` : ''}
       </table>
       ${ev.observacion_coordinador ? `<div class="sec">OBSERVACIONES</div>

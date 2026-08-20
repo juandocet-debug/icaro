@@ -95,6 +95,13 @@ const isOutsideLoadDateRange = (ev: EvidenciaGeneral, desde: string, hasta: stri
   return Boolean((desde && loadDate < desde) || (hasta && loadDate > hasta));
 };
 
+const isOutsideExecutionDateRange = (ev: EvidenciaGeneral, desde: string, hasta: string): boolean => {
+  if (!desde && !hasta) return false;
+  const executionDate = ev.fecha_ejecucion?.slice(0, 10);
+  if (!executionDate) return true;
+  return Boolean((desde && executionDate < desde) || (hasta && executionDate > hasta));
+};
+
 const toUrl = (url: string) => {
   const API_BASE = env.apiUrl;
   return url?.startsWith('http') ? url : `${API_BASE}${url}`;
@@ -137,8 +144,10 @@ export const EvidenciasDashboardScreen: React.FC<Props> = ({ proyectoId }) => {
   const [selectedComponente, setSelectedComponente] = useState('todos');
   const [selectedAccion, setSelectedAccion] = useState('todos');
   const [selectedGrupoId, setSelectedGrupoId] = useState<string | null>(null);
-  const [fechaDesde, setFechaDesde] = useState('');
-  const [fechaHasta, setFechaHasta] = useState('');
+  const [fechaEjecucionDesde, setFechaEjecucionDesde] = useState('');
+  const [fechaEjecucionHasta, setFechaEjecucionHasta] = useState('');
+  const [fechaCargaDesde, setFechaCargaDesde] = useState('');
+  const [fechaCargaHasta, setFechaCargaHasta] = useState('');
 
   const selectedAccionId = useMemo(() => {
     if (selectedAccion === 'todos') return null;
@@ -274,7 +283,7 @@ export const EvidenciasDashboardScreen: React.FC<Props> = ({ proyectoId }) => {
   // Reset del paginado al cambiar filtros
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, selectedEstado, selectedColaborador, selectedMeta, selectedComponente, selectedAccion, fechaDesde, fechaHasta, pageSize]);
+  }, [searchQuery, selectedEstado, selectedColaborador, selectedMeta, selectedComponente, selectedAccion, fechaEjecucionDesde, fechaEjecucionHasta, fechaCargaDesde, fechaCargaHasta, pageSize]);
 
   // Lista única de colaboradores (Filtro Inteligente)
   const colaboradores = useMemo(() => {
@@ -283,13 +292,14 @@ export const EvidenciasDashboardScreen: React.FC<Props> = ({ proyectoId }) => {
       if (selectedEstado !== 'todos' && ev.estado !== selectedEstado) return;
       if (selectedMeta !== 'todos' && ev.accion?.meta_nombre !== selectedMeta) return;
       if (selectedAccion !== 'todos' && ev.accion?.id !== selectedAccion) return;
-      if (isOutsideLoadDateRange(ev, fechaDesde, fechaHasta)) return;
+      if (isOutsideExecutionDateRange(ev, fechaEjecucionDesde, fechaEjecucionHasta)) return;
+      if (isOutsideLoadDateRange(ev, fechaCargaDesde, fechaCargaHasta)) return;
       if (ev.creada_por?.nombre) {
         nombres.add(ev.creada_por.nombre);
       }
     });
     return Array.from(nombres).sort();
-  }, [evidencias, selectedEstado, selectedMeta, selectedAccion, fechaDesde, fechaHasta]);
+  }, [evidencias, selectedEstado, selectedMeta, selectedAccion, fechaEjecucionDesde, fechaEjecucionHasta, fechaCargaDesde, fechaCargaHasta]);
 
   const colaboradorOptions = useMemo(() => {
     const options: SelectOption[] = [
@@ -317,13 +327,14 @@ export const EvidenciasDashboardScreen: React.FC<Props> = ({ proyectoId }) => {
       if (selectedColaborador !== 'todos' && ev.creada_por?.nombre !== selectedColaborador) return;
       if (selectedComponente !== 'todos' && ev.accion?.componente_nombre !== selectedComponente) return;
       if (selectedAccion !== 'todos' && ev.accion?.id !== selectedAccion) return;
-      if (isOutsideLoadDateRange(ev, fechaDesde, fechaHasta)) return;
+      if (isOutsideExecutionDateRange(ev, fechaEjecucionDesde, fechaEjecucionHasta)) return;
+      if (isOutsideLoadDateRange(ev, fechaCargaDesde, fechaCargaHasta)) return;
       if (ev.accion?.meta_nombre) {
         names.add(ev.accion.meta_nombre);
       }
     });
     return Array.from(names).sort();
-  }, [evidencias, selectedEstado, selectedColaborador, selectedComponente, selectedAccion, fechaDesde, fechaHasta]);
+  }, [evidencias, selectedEstado, selectedColaborador, selectedComponente, selectedAccion, fechaEjecucionDesde, fechaEjecucionHasta, fechaCargaDesde, fechaCargaHasta]);
 
   // Lista única de componentes (Filtro Inteligente — depende de Meta seleccionada)
   const componentes = useMemo(() => {
@@ -333,13 +344,14 @@ export const EvidenciasDashboardScreen: React.FC<Props> = ({ proyectoId }) => {
       if (selectedColaborador !== 'todos' && ev.creada_por?.nombre !== selectedColaborador) return;
       if (selectedMeta !== 'todos' && ev.accion?.meta_nombre !== selectedMeta) return;
       if (selectedAccion !== 'todos' && ev.accion?.id !== selectedAccion) return;
-      if (isOutsideLoadDateRange(ev, fechaDesde, fechaHasta)) return;
+      if (isOutsideExecutionDateRange(ev, fechaEjecucionDesde, fechaEjecucionHasta)) return;
+      if (isOutsideLoadDateRange(ev, fechaCargaDesde, fechaCargaHasta)) return;
       if (ev.accion?.componente_nombre) {
         names.add(ev.accion.componente_nombre);
       }
     });
     return Array.from(names).sort();
-  }, [evidencias, selectedEstado, selectedColaborador, selectedMeta, selectedAccion, fechaDesde, fechaHasta]);
+  }, [evidencias, selectedEstado, selectedColaborador, selectedMeta, selectedAccion, fechaEjecucionDesde, fechaEjecucionHasta, fechaCargaDesde, fechaCargaHasta]);
 
   // Lista única de acciones/actividades (Filtro Inteligente)
   const acciones = useMemo(() => {
@@ -349,14 +361,15 @@ export const EvidenciasDashboardScreen: React.FC<Props> = ({ proyectoId }) => {
       if (selectedColaborador !== 'todos' && ev.creada_por?.nombre !== selectedColaborador) return;
       if (selectedMeta !== 'todos' && ev.accion?.meta_nombre !== selectedMeta) return;
       if (selectedComponente !== 'todos' && ev.accion?.componente_nombre !== selectedComponente) return;
-      if (isOutsideLoadDateRange(ev, fechaDesde, fechaHasta)) return;
+      if (isOutsideExecutionDateRange(ev, fechaEjecucionDesde, fechaEjecucionHasta)) return;
+      if (isOutsideLoadDateRange(ev, fechaCargaDesde, fechaCargaHasta)) return;
       if (ev.accion?.id && ev.accion?.nombre) {
         opciones.set(ev.accion.id, ev.accion.nombre);
       }
     });
     return Array.from(opciones, ([id, nombre]) => ({ id, nombre }))
       .sort((a, b) => a.nombre.localeCompare(b.nombre));
-  }, [evidencias, selectedEstado, selectedColaborador, selectedMeta, selectedComponente, fechaDesde, fechaHasta]);
+  }, [evidencias, selectedEstado, selectedColaborador, selectedMeta, selectedComponente, fechaEjecucionDesde, fechaEjecucionHasta, fechaCargaDesde, fechaCargaHasta]);
 
   // Lista única de estados disponibles (Filtro Inteligente)
   const estadosDisponibles = useMemo(() => {
@@ -365,13 +378,14 @@ export const EvidenciasDashboardScreen: React.FC<Props> = ({ proyectoId }) => {
       if (selectedColaborador !== 'todos' && ev.creada_por?.nombre !== selectedColaborador) return;
       if (selectedMeta !== 'todos' && ev.accion?.meta_nombre !== selectedMeta) return;
       if (selectedAccion !== 'todos' && ev.accion?.id !== selectedAccion) return;
-      if (isOutsideLoadDateRange(ev, fechaDesde, fechaHasta)) return;
+      if (isOutsideExecutionDateRange(ev, fechaEjecucionDesde, fechaEjecucionHasta)) return;
+      if (isOutsideLoadDateRange(ev, fechaCargaDesde, fechaCargaHasta)) return;
       if (ev.estado) {
         states.add(ev.estado);
       }
     });
     return Array.from(states).sort();
-  }, [evidencias, selectedColaborador, selectedMeta, selectedAccion, fechaDesde, fechaHasta]);
+  }, [evidencias, selectedColaborador, selectedMeta, selectedAccion, fechaEjecucionDesde, fechaEjecucionHasta, fechaCargaDesde, fechaCargaHasta]);
 
   const ESTADOS_MAP: Record<string, string> = {
     borrador: 'Borrador (Sin enviar)',
@@ -382,7 +396,7 @@ export const EvidenciasDashboardScreen: React.FC<Props> = ({ proyectoId }) => {
   };
 
   // Filtros aplicados
-  const filteredEvidencias = useMemo(() => {
+  const filteredEvidenciasWithoutGroup = useMemo(() => {
     return evidencias.filter(ev => {
       if (searchQuery) {
         const query = searchQuery.toLowerCase().trim();
@@ -407,11 +421,16 @@ export const EvidenciasDashboardScreen: React.FC<Props> = ({ proyectoId }) => {
       if (selectedMeta !== 'todos' && ev.accion?.meta_nombre !== selectedMeta) return false;
       if (selectedComponente !== 'todos' && ev.accion?.componente_nombre !== selectedComponente) return false;
       if (selectedAccion !== 'todos' && ev.accion?.id !== selectedAccion) return false;
-      if (selectedGrupoId && (!ev.grupo || ev.grupo.id !== selectedGrupoId)) return false;
-      if (isOutsideLoadDateRange(ev, fechaDesde, fechaHasta)) return false;
+      if (isOutsideExecutionDateRange(ev, fechaEjecucionDesde, fechaEjecucionHasta)) return false;
+      if (isOutsideLoadDateRange(ev, fechaCargaDesde, fechaCargaHasta)) return false;
       return true;
     });
-  }, [evidencias, searchQuery, selectedEstado, selectedColaborador, selectedMeta, selectedComponente, selectedAccion, selectedGrupoId, fechaDesde, fechaHasta]);
+  }, [evidencias, searchQuery, selectedEstado, selectedColaborador, selectedMeta, selectedComponente, selectedAccion, fechaEjecucionDesde, fechaEjecucionHasta, fechaCargaDesde, fechaCargaHasta]);
+
+  const filteredEvidencias = useMemo(() => {
+    if (!selectedGrupoId) return filteredEvidenciasWithoutGroup;
+    return filteredEvidenciasWithoutGroup.filter(ev => ev.grupo?.id === selectedGrupoId);
+  }, [filteredEvidenciasWithoutGroup, selectedGrupoId]);
 
   // Datos paginados
   const paginatedEvidencias = useMemo(() => {
@@ -547,8 +566,10 @@ export const EvidenciasDashboardScreen: React.FC<Props> = ({ proyectoId }) => {
     setSelectedComponente('todos');
     setSelectedAccion('todos');
     setSelectedGrupoId(null);
-    setFechaDesde('');
-    setFechaHasta('');
+    setFechaEjecucionDesde('');
+    setFechaEjecucionHasta('');
+    setFechaCargaDesde('');
+    setFechaCargaHasta('');
   };
 
   const getStatusBadgeStyle = (status: string) => { switch (status) {
@@ -561,9 +582,13 @@ export const EvidenciasDashboardScreen: React.FC<Props> = ({ proyectoId }) => {
   };
 
   const [pdfLoading, setPdfLoading] = React.useState(false);
+  const [pdfGroupScope, setPdfGroupScope] = React.useState<'all_groups' | 'filtered'>('all_groups');
 
   const exportToPDF = async () => {
-    if (!filteredEvidencias.length) return;
+    const pdfEvidencias = pdfGroupScope === 'all_groups'
+      ? filteredEvidenciasWithoutGroup
+      : filteredEvidencias;
+    if (!pdfEvidencias.length) return;
     setPdfLoading(true);
 
     // Nombre del proyecto desde las asignaciones del usuario
@@ -580,7 +605,9 @@ export const EvidenciasDashboardScreen: React.FC<Props> = ({ proyectoId }) => {
       : 'Reporte General de Evidencias';
 
     // Grupo: si hay un grupo seleccionado, tomar su nombre de las evidencias
-    const grupoNombre = selectedGrupoId
+    const grupoNombre = pdfGroupScope === 'all_groups'
+      ? (pdfEvidencias.some(ev => ev.grupo) ? 'Todos los grupos' : '')
+      : selectedGrupoId
       ? (filteredEvidencias.find(ev => ev.grupo?.id === selectedGrupoId)?.grupo?.nombre ?? '')
       : '';
 
@@ -590,7 +617,7 @@ export const EvidenciasDashboardScreen: React.FC<Props> = ({ proyectoId }) => {
       componenteNombre,
       accionNombre,
       grupoNombre,
-      evidencias: filteredEvidencias,
+      evidencias: pdfEvidencias,
     });
 
     setPdfLoading(false);
@@ -644,10 +671,23 @@ export const EvidenciasDashboardScreen: React.FC<Props> = ({ proyectoId }) => {
               <Text style={styles.cleanBtnText}>Limpiar filtros</Text>
             </TouchableOpacity>
             {Platform.OS === 'web' && (
-              <TouchableOpacity onPress={exportToPDF} style={[styles.pdfBtn, pdfLoading && { opacity: 0.6 } as any]} disabled={pdfLoading}>
-                <Ionicons name={pdfLoading ? 'hourglass-outline' : 'download-outline'} size={14} color="#ffffff" style={{ marginRight: 4 }} />
-                <Text style={styles.pdfBtnText}>{pdfLoading ? 'Generando...' : 'Exportar PDF'}</Text>
-              </TouchableOpacity>
+              <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' } as any}>
+                <select
+                  aria-label="Alcance de grupos del PDF"
+                  title="Elige si el PDF incluye todos los grupos o respeta el grupo filtrado"
+                  style={{ ...htmlSelectStyle, width: 205, border: '1px solid #c4b5fd', borderRadius: 999, paddingLeft: 12 } as any}
+                  value={pdfGroupScope}
+                  onChange={(e: any) => setPdfGroupScope(e.target.value as 'all_groups' | 'filtered')}
+                  disabled={pdfLoading}
+                >
+                  <option value="all_groups">PDF: todos los grupos</option>
+                  <option value="filtered">PDF: respetar grupo filtrado</option>
+                </select>
+                <TouchableOpacity onPress={exportToPDF} style={[styles.pdfBtn, pdfLoading && { opacity: 0.6 } as any]} disabled={pdfLoading}>
+                  <Ionicons name={pdfLoading ? 'hourglass-outline' : 'download-outline'} size={14} color="#ffffff" style={{ marginRight: 4 }} />
+                  <Text style={styles.pdfBtnText}>{pdfLoading ? 'Generando...' : 'Exportar PDF'}</Text>
+                </TouchableOpacity>
+              </View>
             )}
           </View>
         </View>
@@ -782,7 +822,36 @@ export const EvidenciasDashboardScreen: React.FC<Props> = ({ proyectoId }) => {
             </View>
           )}
 
-          {/* Fechas */}
+          {/* Fecha real de ejecución: filtro principal del informe */}
+          <View style={[styles.filterGroup, { flex: 1, minWidth: 130 } as any]}>
+            <Text style={styles.filterLabel}>Fecha real desde</Text>
+            <View style={styles.inputWrapper}>
+              {Platform.OS === 'web' ? (
+                <input
+                  type="date"
+                  style={htmlDateInputStyle}
+                  value={fechaEjecucionDesde}
+                  onChange={(e: any) => setFechaEjecucionDesde(e.target.value)}
+                />
+              ) : null}
+            </View>
+          </View>
+
+          <View style={[styles.filterGroup, { flex: 1, minWidth: 130 } as any]}>
+            <Text style={styles.filterLabel}>Fecha real hasta</Text>
+            <View style={styles.inputWrapper}>
+              {Platform.OS === 'web' ? (
+                <input
+                  type="date"
+                  style={htmlDateInputStyle}
+                  value={fechaEjecucionHasta}
+                  onChange={(e: any) => setFechaEjecucionHasta(e.target.value)}
+                />
+              ) : null}
+            </View>
+          </View>
+
+          {/* Fecha de carga: filtro adicional e independiente */}
           <View style={[styles.filterGroup, { flex: 1, minWidth: 130 } as any]}>
             <Text style={styles.filterLabel}>Fecha de carga desde</Text>
             <View style={styles.inputWrapper}>
@@ -790,8 +859,8 @@ export const EvidenciasDashboardScreen: React.FC<Props> = ({ proyectoId }) => {
                 <input
                   type="date"
                   style={htmlDateInputStyle}
-                  value={fechaDesde}
-                  onChange={(e: any) => setFechaDesde(e.target.value)}
+                  value={fechaCargaDesde}
+                  onChange={(e: any) => setFechaCargaDesde(e.target.value)}
                 />
               ) : null}
             </View>
@@ -804,8 +873,8 @@ export const EvidenciasDashboardScreen: React.FC<Props> = ({ proyectoId }) => {
                 <input
                   type="date"
                   style={htmlDateInputStyle}
-                  value={fechaHasta}
-                  onChange={(e: any) => setFechaHasta(e.target.value)}
+                  value={fechaCargaHasta}
+                  onChange={(e: any) => setFechaCargaHasta(e.target.value)}
                 />
               ) : null}
             </View>
