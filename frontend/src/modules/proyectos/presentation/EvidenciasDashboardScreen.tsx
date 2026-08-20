@@ -617,6 +617,7 @@ export const EvidenciasDashboardScreen: React.FC<Props> = ({ proyectoId }) => {
       componenteNombre,
       accionNombre,
       grupoNombre,
+      agruparPorGrupo: pdfGroupScope === 'all_groups',
       evidencias: pdfEvidencias,
     });
 

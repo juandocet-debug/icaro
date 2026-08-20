@@ -11,13 +11,30 @@ import { getSharedCss, portadaHtml, evidenciaPageHtml, fotosPageHtml, planSesion
 import { LOGO_SUPERIOR_B64, LOGO_INFERIOR_B64 } from './pdfLogos';
 import { env } from '../../../../../config/env';
 
-// Las listas contienen texto pequeno y firmas: 3200 px conserva cerca de
-// 370 DPI en el lado largo de la hoja A4 usada por la plantilla.
-const ASISTENCIA_PDF_MAX_PX = 3200;
-const ASISTENCIA_PDF_QUALITY = 0.98;
+// Las listas contienen texto pequeno y firmas. 4096 px conserva hasta cerca
+// de 480 DPI en la hoja A4 y la calidad 1 evita una segunda pérdida JPEG.
+const ASISTENCIA_PDF_MAX_PX = 4096;
+const ASISTENCIA_PDF_QUALITY = 1;
 
 const toAbsUrl = (url: string) =>
   !url ? '' : url.startsWith('http') ? url : `${(env as any).apiUrl ?? ''}${url}`;
+
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  mapper: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let nextIndex = 0;
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (nextIndex < items.length) {
+      const index = nextIndex++;
+      results[index] = await mapper(items[index], index);
+    }
+  });
+  await Promise.all(workers);
+  return results;
+}
 
 export interface PDFParams {
   proyectoNombre: string;
@@ -25,6 +42,7 @@ export interface PDFParams {
   componenteNombre: string;
   accionNombre: string;
   grupoNombre?: string;
+  agruparPorGrupo?: boolean;
   evidencias: any[];
 }
 
@@ -33,7 +51,7 @@ export async function generateEvidenciasPDF(params: PDFParams): Promise<string |
     return 'La descarga de PDF solo está disponible en la versión web.';
   }
 
-  const { proyectoNombre, metaNombre, componenteNombre, accionNombre, grupoNombre, evidencias } = params;
+  const { proyectoNombre, metaNombre, componenteNombre, accionNombre, grupoNombre, agruparPorGrupo, evidencias } = params;
   // El reporte debe respetar exactamente el resultado de los filtros.
   // No truncar silenciosamente: antes se exportaban solo las primeras 20.
   const evs = evidencias;
@@ -56,33 +74,24 @@ export async function generateEvidenciasPDF(params: PDFParams): Promise<string |
     });
   });
 
-  // ── 2. Comprimir TODO en paralelo (logos ya en base64 → sin fetch) ────────
-  const allPromises: Promise<string | null>[] = [
+  // ── 2. Preparar imágenes. Las evidencias se procesan con concurrencia
+  // limitada para que un PDF general de alta resolución no agote memoria. ──
+  const [logoTop, logoBot] = await Promise.all([
     imageSourceToBase64(LOGO_SUPERIOR_B64, 320, 0.9, 'image/png'),
     imageSourceToBase64(LOGO_INFERIOR_B64, 320, 0.9, 'image/png'),
-    ...imgRefs.map((r) => {
+  ]);
+  const compressedImgs = await mapWithConcurrency(imgRefs, 4, async (r) => {
       if (r.isAsis) {
         return imageUrlToBase64(r.url, ASISTENCIA_PDF_MAX_PX, ASISTENCIA_PDF_QUALITY);
       }
       return imageUrlToBase64(r.url, r.isPlan ? 1200 : 820, r.isPlan ? 0.62 : 0.54);
-    }),
-  ];
-
-  const [logoTop, logoBot, ...compressedImgs] = await Promise.all(allPromises);
+  });
 
   const imgMap = new Map<string, string | null>();
   imgRefs.forEach((r, i) => imgMap.set(`${r.evIdx}-${r.sIdx}`, compressedImgs[i] ?? null));
 
   // ── 3. Ensamblar HTML ─────────────────────────────────────────────────────
-  const calHtml = buildCalendarHtml(evs);
-
-  const portada = portadaHtml({
-    proyectoNombre, metaNombre, componenteNombre, accionNombre,
-    grupoNombre: grupoNombre || '',
-    calendarHtml: calHtml, logoTopB64: logoTop, logoBottomB64: logoBot,
-  });
-
-  const paginas = evs.map((ev, evIdx) => {
+  const renderEvidencia = (ev: any, evIdx: number) => {
     const informe = evidenciaPageHtml(ev, logoTop, logoBot, accionNombre);
 
     // Separar fotos regulares de listas de asistencia
@@ -114,14 +123,42 @@ export async function generateEvidenciasPDF(params: PDFParams): Promise<string |
       + asistenciaPageHtml(fotosAsistencia, logoTop, logoBot, accionNombre)
       + docsPageHtml(docs, logoTop, logoBot, accionNombre)
     );
-  }).join('');
+  };
+
+  const renderPortada = (grupo: string, evidenciasGrupo: any[]) => portadaHtml({
+    proyectoNombre, metaNombre, componenteNombre, accionNombre,
+    grupoNombre: grupo,
+    calendarHtml: buildCalendarHtml(evidenciasGrupo),
+    logoTopB64: logoTop, logoBottomB64: logoBot,
+  });
+
+  // En el PDF general, cada grupo recibe su propia portada/calendario y luego
+  // sus evidencias. El flujo de un grupo individual permanece sin cambios.
+  const debeAgrupar = Boolean(agruparPorGrupo && evs.some((ev) => ev.grupo));
+  let contenido = '';
+  if (debeAgrupar) {
+    const grupos = new Map<string, { nombre: string; items: { ev: any; evIdx: number }[] }>();
+    evs.forEach((ev, evIdx) => {
+      const key = ev.grupo?.id || '__sin_grupo__';
+      const nombre = ev.grupo?.nombre || 'Sin grupo asignado';
+      if (!grupos.has(key)) grupos.set(key, { nombre, items: [] });
+      grupos.get(key)!.items.push({ ev, evIdx });
+    });
+    contenido = Array.from(grupos.values()).map(({ nombre, items }) => (
+      renderPortada(nombre, items.map(({ ev }) => ev))
+      + items.map(({ ev, evIdx }) => renderEvidencia(ev, evIdx)).join('')
+    )).join('');
+  } else {
+    contenido = renderPortada(grupoNombre || '', evs)
+      + evs.map((ev, evIdx) => renderEvidencia(ev, evIdx)).join('');
+  }
 
   const html = `<!DOCTYPE html><html lang="es"><head>
     <meta charset="UTF-8"/>
     <title>Reporte — ${accionNombre}</title>
     <style>${getSharedCss()}</style>
   </head><body>
-    ${portada}${paginas}
+    ${contenido}
     <script>window.onload=()=>{window.print();window.onafterprint=()=>window.close();};</script>
   </body></html>`;
 
