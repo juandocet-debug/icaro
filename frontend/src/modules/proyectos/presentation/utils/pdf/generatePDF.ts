@@ -11,6 +11,11 @@ import { getSharedCss, portadaHtml, evidenciaPageHtml, fotosPageHtml, planSesion
 import { LOGO_SUPERIOR_B64, LOGO_INFERIOR_B64 } from './pdfLogos';
 import { env } from '../../../../../config/env';
 
+// Las listas contienen texto pequeno y firmas: 3200 px conserva cerca de
+// 370 DPI en el lado largo de la hoja A4 usada por la plantilla.
+const ASISTENCIA_PDF_MAX_PX = 3200;
+const ASISTENCIA_PDF_QUALITY = 0.98;
+
 const toAbsUrl = (url: string) =>
   !url ? '' : url.startsWith('http') ? url : `${(env as any).apiUrl ?? ''}${url}`;
 
@@ -55,7 +60,12 @@ export async function generateEvidenciasPDF(params: PDFParams): Promise<string |
   const allPromises: Promise<string | null>[] = [
     imageSourceToBase64(LOGO_SUPERIOR_B64, 320, 0.9, 'image/png'),
     imageSourceToBase64(LOGO_INFERIOR_B64, 320, 0.9, 'image/png'),
-    ...imgRefs.map((r) => imageUrlToBase64(r.url, r.isPlan ? 1200 : 820, r.isPlan ? 0.62 : 0.54)),
+    ...imgRefs.map((r) => {
+      if (r.isAsis) {
+        return imageUrlToBase64(r.url, ASISTENCIA_PDF_MAX_PX, ASISTENCIA_PDF_QUALITY);
+      }
+      return imageUrlToBase64(r.url, r.isPlan ? 1200 : 820, r.isPlan ? 0.62 : 0.54);
+    }),
   ];
 
   const [logoTop, logoBot, ...compressedImgs] = await Promise.all(allPromises);
