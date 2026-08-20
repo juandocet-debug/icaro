@@ -177,8 +177,8 @@ export const EvidenciasGrid = ({
               </View>
 
               {!!e.codigo_doxa && (
-                <View style={{ alignSelf: 'flex-start', marginTop: 8, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.18)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.28)' } as any}>
-                  <Text style={{ fontFamily: typography.fontFamily, fontSize: 10, color: '#ffffff', fontWeight: '800', letterSpacing: 0.4 }}>
+                <View style={gridStyles.doxaBadge}>
+                  <Text style={gridStyles.doxaBadgeTxt} numberOfLines={1}>
                     {e.codigo_doxa_etiqueta || e.codigo_doxa}
                   </Text>
                 </View>
@@ -222,4 +222,6 @@ const gridStyles = {
   btnPdfTxt:   { fontSize: 12, color: colors.primary, fontWeight: '600' as any },
   pdfToast:    { position: 'absolute' as any, bottom: -32, right: 0, backgroundColor: '#1e293b', borderRadius: 6, paddingHorizontal: 10, paddingVertical: 5, zIndex: 100 } as any,
   pdfToastTxt: { fontSize: 11, color: '#fff', fontFamily: typography.fontFamily } as any,
+  doxaBadge:   { alignSelf: 'flex-start', maxWidth: '100%', marginTop: spacing.xs, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.18)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.28)' } as any,
+  doxaBadgeTxt:{ fontFamily: typography.fontFamily, fontSize: 10, color: '#fff', fontWeight: '800' as any, letterSpacing: 0.4 },
 };

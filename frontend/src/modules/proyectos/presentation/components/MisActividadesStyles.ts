@@ -49,14 +49,14 @@ export const styles = StyleSheet.create({
 
   // Tarjetas Dashboard Métricas
   evGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginTop: spacing.md } as any,
-  evCardMetric: { width: 220, height: 140, borderRadius: 20, padding: spacing.md, justifyContent: 'space-between', elevation: 2, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 8, shadowOffset: { width: 0, height: 4 } as any },
+  evCardMetric: { width: 220, minHeight: 158, borderRadius: 20, padding: spacing.md, justifyContent: 'space-between', elevation: 2, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 8, shadowOffset: { width: 0, height: 4 } as any },
   evCardMetricTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   evCardMetricTitle: { fontFamily: typography.fontFamily, fontSize: 13, color: 'rgba(255,255,255,0.9)', flex: 1, marginRight: 8, marginTop: 4 },
   evCardMetricIconBox: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  evCardMetricMid: { flex: 1, justifyContent: 'center' },
-  evCardMetricBigVal: { fontFamily: typography.fontFamily, fontSize: 32, fontWeight: typography.weights.bold, color: '#fff' },
+  evCardMetricMid: { marginTop: spacing.xs, justifyContent: 'center' },
+  evCardMetricBigVal: { fontFamily: typography.fontFamily, fontSize: 28, fontWeight: typography.weights.bold, color: '#fff' },
   evCardMetricUnit: { fontSize: 14, fontWeight: typography.weights.medium },
-  evCardMetricBottom: { alignItems: 'flex-end' },
+  evCardMetricBottom: { alignItems: 'flex-end', marginTop: spacing.xs },
   evCardMetricSub: { fontFamily: typography.fontFamily, fontSize: 11, color: 'rgba(255,255,255,0.8)', textAlign: 'right', lineHeight: 16 },
   evCardMetricAdd: { width: 220, height: 140, borderRadius: 20, borderWidth: 2, borderColor: colors.border, borderStyle: 'dashed' as any, alignItems: 'center', justifyContent: 'center', gap: 8 },
   evCardMetricAddTxt: { fontFamily: typography.fontFamily, fontSize: typography.sizes.sm, fontWeight: typography.weights.bold, color: colors.textSecondary },
