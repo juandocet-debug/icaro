@@ -143,13 +143,13 @@ export function getSharedCss(): string {
       object-fit: contain;
     }
 
-    /* Asistencia: hoja vertical A4, imagen rotada 90° para verse horizontal */
+    /* Asistencia: una hoja A4 completa, girada hacia el lado de lectura. */
     .asist-img {
       flex: 1; min-height: 0; overflow: hidden;
       display: flex; align-items: center; justify-content: center;
     }
     .asist-img img {
-      transform: rotate(90deg);
+      transform: rotate(-90deg);
       /* Intercambia ancho/alto para llenar el área disponible tras la rotación */
       width: 218mm;       /* → se convierte en alto visual tras rotate */
       height: 186mm;      /* → se convierte en ancho visual tras rotate */

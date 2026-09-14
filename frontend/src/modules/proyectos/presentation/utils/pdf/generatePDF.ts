@@ -11,9 +11,9 @@ import { getSharedCss, portadaHtml, evidenciaPageHtml, fotosPageHtml, planSesion
 import { LOGO_SUPERIOR_B64, LOGO_INFERIOR_B64 } from './pdfLogos';
 import { env } from '../../../../../config/env';
 
-// Las listas contienen texto pequeno y firmas. 4096 px conserva hasta cerca
-// de 480 DPI en la hoja A4 y la calidad 1 evita una segunda pérdida JPEG.
-const ASISTENCIA_PDF_MAX_PX = 4096;
+// Las listas contienen texto pequeno y firmas. 6000 px conserva el máximo
+// detalle útil de capturas grandes y la calidad 1 evita otra pérdida JPEG.
+const ASISTENCIA_PDF_MAX_PX = 6000;
 const ASISTENCIA_PDF_QUALITY = 1;
 
 const toAbsUrl = (url: string) =>
