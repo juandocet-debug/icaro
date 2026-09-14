@@ -89,7 +89,13 @@ export async function generateEvidenciasPDF(params: PDFParams): Promise<string |
   ]);
   const compressedImgs = await mapWithConcurrency(imgRefs, 4, async (r) => {
       if (r.isAsis) {
-        return imageUrlToBase64(r.url, ASISTENCIA_PDF_MAX_PX, ASISTENCIA_PDF_QUALITY);
+        return imageUrlToBase64(
+          r.url,
+          ASISTENCIA_PDF_MAX_PX,
+          ASISTENCIA_PDF_QUALITY,
+          'image/jpeg',
+          true,
+        );
       }
       return imageUrlToBase64(r.url, r.isPlan ? 1200 : 820, r.isPlan ? 0.62 : 0.54);
   });
