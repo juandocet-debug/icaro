@@ -50,6 +50,8 @@ export const useMisActividades = (selectedAccionId?: string) => {
   const [soporteObs, setSoporteObs] = useState('');
   const [soporteErr, setSoporteErr] = useState<string | null>(null);
   const [soporteSaving, setSoporteSaving] = useState(false);
+  const [evUpdateSaving, setEvUpdateSaving] = useState(false);
+  const [evUpdateErr, setEvUpdateErr] = useState<string | null>(null);
 
   // Revisión por Coordinador
   const [reviewObs, setReviewObs] = useState('');
@@ -346,6 +348,41 @@ export const useMisActividades = (selectedAccionId?: string) => {
     }
   };
 
+  const handleUpdateEvidencia = async (payload: {
+    descripcion?: string | null;
+    fecha_ejecucion?: string | null;
+    grupo_id?: string | null;
+    codigo_doxa?: string | null;
+  }) => {
+    if (!selectedAct || !activeEv) return false;
+    setEvUpdateSaving(true);
+    setEvUpdateErr(null);
+    try {
+      const data = {
+        ...payload,
+        codigo_doxa: payload.codigo_doxa ? normalizarCodigoDoxa(payload.codigo_doxa) : payload.codigo_doxa,
+      };
+      const res = await api.put(
+        `/api/mis-actividades/${selectedAct.accion.id}/evidencias-operativas/${activeEv.id}/`,
+        data
+      );
+      if (res.data?.datos) {
+        setEvidencias((prev) => prev.map((ev) => (
+          String(ev.id) === String(activeEv.id) ? res.data.datos : ev
+        )));
+      } else {
+        const evsRes = await api.get(`/api/mis-actividades/${selectedAct.accion.id}/evidencias-operativas/`);
+        setEvidencias(evsRes.data.datos || []);
+      }
+      return true;
+    } catch (e: any) {
+      setEvUpdateErr(e?.response?.data?.error || 'No se pudieron guardar los cambios de la evidencia.');
+      return false;
+    } finally {
+      setEvUpdateSaving(false);
+    }
+  };
+
   const handleEnviarEvidencia = async () => {
     if (!selectedAct || !activeEv) return;
     try {
@@ -406,6 +443,7 @@ export const useMisActividades = (selectedAccionId?: string) => {
     evModalErr, evModalSaving, openEvModal, handleCreateEvidencia,
     soporteReqId, setSoporteReqId, soporteFile, setSoporteFile, soporteFileName, setSoporteFileName,
     soporteFecha, setSoporteFecha, soporteObs, setSoporteObs, soporteErr, soporteSaving, handleGuardarSoporte, handleDeleteSoporte, handleEnviarEvidencia,
+    evUpdateSaving, evUpdateErr, setEvUpdateErr, handleUpdateEvidencia,
     reviewObs, setReviewObs, reviewSaving, reviewErr, handleReviewEvidencia, handleReabrirEvidencia,
     previewSoporte, setPreviewSoporte, activeEv, requisitosEvidenciaActiva, reqsCompletadosActiveEv
   };

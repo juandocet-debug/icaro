@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Modal } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, TouchableOpacity, ScrollView, Modal, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../../../shared/constants/colors';
 import { typography } from '../../../../shared/constants/typography';
@@ -8,6 +8,12 @@ import { RequisitosList } from './RequisitosList';
 import { SoportePreview } from './SoportePreview';
 import { ReviewActionsPanel } from './ReviewActionsPanel';
 import { UploadActionsPanel } from './UploadActionsPanel';
+import { TextField } from '../../../../shared/components/TextField';
+import { Button } from '../../../../shared/components/Button';
+import { ActionGroupSearchSelect } from './groups/ActionGroupSearchSelect';
+
+const CODIGO_DOXA_RE = /^(?=.*[A-Z])(?=.*\d)[A-Z0-9]{5,16}$/;
+const normalizarCodigoDoxa = (value: string) => value.replace(/\s+/g, '').toUpperCase();
 
 const estadoColor = (e: string) => {
   switch (e) {
@@ -36,16 +42,37 @@ export const EvidenciaDetailModal = ({
   previewSoporte, setPreviewSoporte, handleDeleteSoporte, setSoporteReqId,
   soporteReqId, soporteFile, setSoporteFile, soporteFileName, setSoporteFileName,
   soporteObs, setSoporteObs, handleGuardarSoporte, soporteSaving, soporteErr, handleEnviarEvidencia,
-  reviewObs, setReviewObs, handleReviewEvidencia, reviewSaving, reviewErr, handleReabrirEvidencia
+  reviewObs, setReviewObs, handleReviewEvidencia, reviewSaving, reviewErr, handleReabrirEvidencia,
+  evUpdateSaving, evUpdateErr, setEvUpdateErr, handleUpdateEvidencia
 }: any) => {
+  const [showConfirmSend, setShowConfirmSend] = useState(false);
+  const [editDescripcion, setEditDescripcion] = useState('');
+  const [editFecha, setEditFecha] = useState('');
+  const [editGrupoId, setEditGrupoId] = useState('');
+  const [editCodigoDoxa, setEditCodigoDoxa] = useState('');
+
+  useEffect(() => {
+    if (!activeEv) return;
+    setEditDescripcion(activeEv.descripcion || '');
+    setEditFecha(activeEv.fecha_ejecucion || '');
+    setEditGrupoId(activeEv.grupo?.id || '');
+    setEditCodigoDoxa(activeEv.codigo_doxa || '');
+    setEvUpdateErr?.(null);
+  }, [activeEv?.id]);
 
   if (!activeEvId || !activeEv || !selectedAct) return null;
-
-  const [showConfirmSend, setShowConfirmSend] = useState(false);
 
   const { mi_asignacion } = selectedAct;
   const isOwner = activeEv.creada_por?.id === mi_asignacion?.usuario_id || !selectedAct.es_gestor;
   const canEditActiveEv = isOwner && (activeEv.estado === 'borrador' || activeEv.estado === 'reabierta');
+  const requiereGrupos = !!selectedAct.accion?.requiere_grupos;
+  const requiereCodigoDoxa = !!selectedAct.accion?.requiere_codigo_doxa;
+  const editCodigoDoxaNormalizado = normalizarCodigoDoxa(editCodigoDoxa);
+  const editCodigoDoxaValido = !requiereCodigoDoxa || CODIGO_DOXA_RE.test(editCodigoDoxaNormalizado);
+  const canSaveMeta = canEditActiveEv
+    && !evUpdateSaving
+    && (!requiereGrupos || !!editGrupoId)
+    && editCodigoDoxaValido;
 
   const renderConfirmSendModal = () => (
     <Modal visible={showConfirmSend} transparent animationType="fade" onRequestClose={() => setShowConfirmSend(false)}>
@@ -175,6 +202,81 @@ export const EvidenciaDetailModal = ({
           </View>
         )}
       </View>
+
+      {canEditActiveEv && (
+        <View style={[styles.activeEvMetaBox, { gap: 10 } as any]}>
+          <Text style={{ fontFamily: typography.fontFamily, fontSize: 12, fontWeight: '700', color: colors.textPrimary }}>
+            Corregir datos de la evidencia
+          </Text>
+
+          {requiereGrupos && (
+            <ActionGroupSearchSelect
+              accionId={selectedAct.accion.id}
+              selectedGrupoId={editGrupoId}
+              onSelectGrupo={(g) => setEditGrupoId(g ? g.id : '')}
+              error={null}
+            />
+          )}
+
+          {requiereCodigoDoxa && (
+            <View>
+              <TextField
+                label="Código Doxa *"
+                value={editCodigoDoxa}
+                onChangeText={(v) => setEditCodigoDoxa(normalizarCodigoDoxa(v))}
+                placeholder="Ej: TOG01C03"
+                autoCapitalize="characters"
+              />
+              {!editCodigoDoxaValido && (
+                <Text style={{ fontFamily: typography.fontFamily, fontSize: 11, color: colors.error, marginTop: -4 }}>
+                  Debe tener de 5 a 16 caracteres, incluir letras y números, y no contener espacios ni símbolos.
+                </Text>
+              )}
+            </View>
+          )}
+
+          <TextField
+            label="Descripción / Bitácora"
+            value={editDescripcion}
+            onChangeText={setEditDescripcion}
+            placeholder="Detalla las actividades realizadas..."
+          />
+
+          <View>
+            <Text style={styles.formLabel}>Fecha de Ejecución</Text>
+            {Platform.OS === 'web' ? (
+              <input
+                type="date"
+                value={editFecha}
+                onChange={(e: any) => setEditFecha(e.target.value)}
+                style={styles.htmlDateInput}
+              />
+            ) : (
+              <TextField
+                label=""
+                value={editFecha}
+                onChangeText={setEditFecha}
+                placeholder="YYYY-MM-DD"
+              />
+            )}
+          </View>
+
+          {!!evUpdateErr && <Text style={{ fontFamily: typography.fontFamily, fontSize: 12, color: colors.error }}>{evUpdateErr}</Text>}
+
+          <Button
+            label={evUpdateSaving ? 'Guardando...' : 'Guardar cambios'}
+            loading={evUpdateSaving}
+            disabled={!canSaveMeta}
+            onPress={() => handleUpdateEvidencia({
+              descripcion: editDescripcion.trim() || null,
+              fecha_ejecucion: editFecha || null,
+              grupo_id: requiereGrupos ? editGrupoId : activeEv.grupo?.id || null,
+              codigo_doxa: requiereCodigoDoxa ? editCodigoDoxaNormalizado : activeEv.codigo_doxa || null,
+            })}
+            style={{ backgroundColor: colors.primary }}
+          />
+        </View>
+      )}
 
       <RequisitosList
         requisitosEvidenciaActiva={requisitosEvidenciaActiva}

@@ -212,6 +212,45 @@ def test_evidencias_requiere_grupos_validation(api_client, superuser, action_req
 
 
 @pytest.mark.django_db
+def test_evidencia_reabierta_permite_corregir_fecha_y_grupo(api_client, superuser, action_req_groups):
+    api_client.force_authenticate(user=superuser)
+
+    grupo_inicial = AccionGrupoModel.objects.create(accion=action_req_groups, nombre="Grupo Inicial")
+    grupo_corregido = AccionGrupoModel.objects.create(accion=action_req_groups, nombre="Grupo Corregido")
+    ev = EvidenciaActividadModel.objects.create(
+        accion=action_req_groups,
+        creada_por=superuser,
+        nombre="Evidencia para corregir",
+        grupo=grupo_inicial,
+        fecha_ejecucion='2026-09-01',
+        cantidad_ejecutada=1.0,
+        estado='reabierta',
+    )
+
+    url = f'/api/mis-actividades/{action_req_groups.id}/evidencias-operativas/{ev.id}/'
+    res = api_client.put(url, data={
+        'fecha_ejecucion': '2026-09-14',
+        'grupo_id': str(grupo_corregido.id),
+        'descripcion': 'Corrección solicitada por coordinación',
+    }, format='json')
+
+    assert res.status_code == 200, res.data
+    assert res.data['datos']['fecha_ejecucion'] == '2026-09-14'
+    assert res.data['datos']['grupo']['id'] == str(grupo_corregido.id)
+    assert res.data['datos']['descripcion'] == 'Corrección solicitada por coordinación'
+
+    ev.estado = 'enviada'
+    ev.save(update_fields=['estado'])
+    res_bloqueada = api_client.put(url, data={
+        'fecha_ejecucion': '2026-09-15',
+        'grupo_id': str(grupo_inicial.id),
+    }, format='json')
+
+    assert res_bloqueada.status_code == 400
+    assert 'borrador o reabierta' in res_bloqueada.data['error']
+
+
+@pytest.mark.django_db
 def test_logical_delete_when_evidence_exists(api_client, superuser, action_req_groups):
     api_client.force_authenticate(user=superuser)
 
