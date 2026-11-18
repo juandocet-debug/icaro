@@ -1,6 +1,7 @@
 import re
 
 from django.db import IntegrityError, transaction
+from django.db.models import Prefetch
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 from rest_framework.views import APIView
@@ -90,7 +91,9 @@ def _s_evidencia(ev):
     if not creada_por_nombre:
         creada_por_nombre = ev.creada_por.username
 
-    soportes = list(getattr(ev, '_prefetched_soportes', None) or ev.soportes.order_by('created_at'))
+    soportes = getattr(ev, '_prefetched_soportes', None)
+    if soportes is None:
+        soportes = list(ev.soportes.order_by('created_at'))
     return {
         'id': str(ev.id),
         'nombre': ev.nombre,
@@ -161,7 +164,10 @@ class EvidenciasOperativasListCreateController(APIView):
             codigo_doxa_duplicado=Exists(duplicados),
         ).select_related(
             'creada_por', 'creada_por__profile', 'grupo'
-        ).prefetch_related('soportes')
+        ).prefetch_related(Prefetch(
+            'soportes', queryset=UploadModel.objects.order_by('created_at'),
+            to_attr='_prefetched_soportes',
+        ))
         if not es_gestor:
             qs = qs.filter(creada_por=request.user)
 
