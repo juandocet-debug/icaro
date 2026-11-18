@@ -19,6 +19,7 @@ export const useMisActividades = (selectedAccionId?: string) => {
   // Detalle de actividad seleccionada
   const [selectedAct, setSelectedAct] = useState<any | null>(null);
   const [detailLoad, setDetailLoad] = useState(false);
+  const [detailProgress, setDetailProgress] = useState(0);
   const [detailErr, setDetailErr] = useState<string | null>(null);
 
   // Evidencias Operativas
@@ -79,6 +80,7 @@ export const useMisActividades = (selectedAccionId?: string) => {
   };
 
   const cargarDetalle = async (id: string) => {
+    setDetailProgress(10);
     setDetailLoad(true);
     setDetailErr(null);
     setPreviewSoporte(null);
@@ -87,9 +89,14 @@ export const useMisActividades = (selectedAccionId?: string) => {
     setSoporteObs('');
     setSoporteReqId('');
     try {
-      const res = await api.get(`/api/mis-actividades/${id}/`);
+      const res = await api.get(`/api/mis-actividades/${id}/`, {
+        onDownloadProgress: ({ loaded, total }) => {
+          if (total) setDetailProgress(prev => Math.max(prev, 10 + Math.round(loaded / total * 35)));
+        },
+      });
       setSelectedAct(res.data.datos);
-      await cargarEvidencias(id);
+      setDetailProgress(50);
+      await cargarEvidencias(id, true);
     } catch {
       setDetailErr('Error al cargar la actividad.');
     } finally {
@@ -97,10 +104,14 @@ export const useMisActividades = (selectedAccionId?: string) => {
     }
   };
 
-  const cargarEvidencias = async (accionId: string) => {
+  const cargarEvidencias = async (accionId: string, trackProgress = false) => {
     setEvidenciasLoad(true);
     try {
-      const res = await api.get(`/api/mis-actividades/${accionId}/evidencias-operativas/`);
+      const res = await api.get(`/api/mis-actividades/${accionId}/evidencias-operativas/`, {
+        onDownloadProgress: trackProgress ? ({ loaded, total }) => {
+          if (total) setDetailProgress(prev => Math.max(prev, 50 + Math.round(loaded / total * 45)));
+        } : undefined,
+      });
       const evs = res.data.datos || [];
       setEvidencias(evs);
       
@@ -433,7 +444,7 @@ export const useMisActividades = (selectedAccionId?: string) => {
     selectedMeta, setSelectedMeta, metasDisponibles,
     selectedProyectoId, setSelectedProyectoId, proyectosDisponibles,
     filteredActs, FILTROS,
-    selectedAct, detailLoad, detailErr, cargarDetalle,
+    selectedAct, detailLoad, detailProgress, detailErr, cargarDetalle,
     evidencias, evidenciasLoad, activeEvId, setActiveEvId,
     evQ, setEvQ, evFechaDesde, setEvFechaDesde, evFechaHasta, setEvFechaHasta,
     filteredEvidencias,

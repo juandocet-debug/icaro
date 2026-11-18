@@ -12,6 +12,7 @@ import { useMisActividades } from './hooks/useMisActividades';
 import { useAccess } from '../../auth/presentation/useAccess';
 import { ActividadesSidebar } from './components/ActividadesSidebar';
 import { EvidenciasGrid } from './components/EvidenciasGrid';
+import { EvidenciasSkeleton } from './components/EvidenciasSkeleton';
 import { EvidenciaDetailModal } from './components/EvidenciaDetailModal';
 import { styles } from './components/MisActividadesStyles';
 import { ActionGroupSearchSelect } from './components/groups/ActionGroupSearchSelect';
@@ -176,14 +177,10 @@ export const MisActividadesScreen: React.FC<Props> = ({ selectedAccionId }) => {
           <ActividadesSidebar {...state} />
 
           {/* COLUMNA CENTRAL: Grilla de Tarjetas de Evidencias */}
-          {state.selectedAct ? (
-            state.detailLoad ? (
-              <View style={[styles.colMain, { justifyContent: 'center', alignItems: 'center' }]}>
-                <ActivityIndicator size="large" color={colors.primary} />
-              </View>
-            ) : (
-              <EvidenciasGrid {...state} proyectoNombre={proyectoNombre} />
-            )
+          {state.detailLoad ? (
+            <EvidenciasSkeleton progress={state.detailProgress} />
+          ) : state.selectedAct ? (
+            <EvidenciasGrid {...state} proyectoNombre={proyectoNombre} />
           ) : (
             <View style={[styles.colMain, { justifyContent: 'center', alignItems: 'center' }]}>
               <Ionicons name="folder-open-outline" size={48} color={colors.textSecondary} style={{ opacity: 0.5, marginBottom: 16 }} />
